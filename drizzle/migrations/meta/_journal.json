@@ -8,6 +8,13 @@
       "when": 1789767985733,
       "tag": "0000_shoghlni_core_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789768004688,
+      "tag": "0001_cvs_storage_policies",
+      "breakpoints": true
     }
   ]
 }
