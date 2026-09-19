@@ -1,11 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { MatchScore } from "@/components/shared/MatchScore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { JobActions } from "@/components/jobs/JobActions";
 
