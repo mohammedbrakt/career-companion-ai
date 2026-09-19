@@ -8,6 +8,7 @@
  * their secret is configured — that is what unlocks local (Egypt / Gulf / on-site) postings.
  */
 import type { RawJob } from "./normalize.server";
+import { relevanceScore } from "./expand.server";
 
 export type CollectorContext = {
   /** Free-text queries derived from users' target roles. */
@@ -288,8 +289,9 @@ const jooble: JobCollector = {
   collect: async (ctx) => {
     const key = env("JOOBLE_API_KEY");
     if (!key) return [];
-    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 4) : ["Egypt"];
-    const queries = ctx.queries.slice(0, 6);
+    // Empty location = worldwide on Jooble, the right default for a global user base.
+    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 4) : [""];
+    const queries = ctx.queries.slice(0, ctx.strict ? 10 : 6);
     const pairs = queries.flatMap((q) => locations.map((loc) => `${q}||${loc}`));
     const jobs = await fanOut(pairs, async (pair) => {
       const [keywords, location] = pair.split("||");
@@ -494,15 +496,9 @@ const GENERIC_WORDS = new Set([
 ]);
 
 export function matchesQuery(title: string, query: string): boolean {
-  const t = title.toLowerCase();
-  const words = query
-    .toLowerCase()
-    .split(/[^a-z0-9+]+/)
-    .filter((w) => w.length > 2);
-  if (words.length === 0) return true;
-  const distinctive = words.filter((w) => !GENERIC_WORDS.has(w));
-  const required = distinctive.length > 0 ? distinctive : words;
-  return required.some((w) => t.includes(w));
+  // Half of the query's distinctive words must appear in the title — one shared
+  // word ("manager", "remote") is not a match.
+  return relevanceScore(title, [query]) >= 0.5;
 }
 
 export const COLLECTORS: JobCollector[] = [
