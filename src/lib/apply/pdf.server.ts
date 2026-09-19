@@ -70,7 +70,7 @@ function escapePdf(text: string) {
 }
 
 function latin1(text: string) {
-  return text.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u00B7/g, "-");
+  return text.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/[\u00B7\u2022]/g, "-");
 }
 
 export function buildResumeFile(doc: ResumeDoc): { bytes: Uint8Array; filename: string; contentType: string } {
