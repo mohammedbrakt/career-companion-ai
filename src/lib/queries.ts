@@ -159,16 +159,24 @@ export const masterCvQuery = (userId: string) =>
   queryOptions({
     queryKey: ["master-cv", userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: cv, error } = await supabase
         .from("cvs")
-        .select("id, title, updated_at, current_version_id, versions:cv_versions(id, version_no, label, file_path, file_type, parsed_data, analysis, created_at)")
+        .select("id, title, updated_at, current_version_id")
         .eq("user_id", userId)
         .eq("kind", "master")
         .is("deleted_at", null)
         .maybeSingle();
       if (error) throw error;
-      if (!data) return null;
-      const versions = [...(data.versions ?? [])].sort((a, b) => b.version_no - a.version_no);
-      return { ...data, versions, current: versions.find((v) => v.id === data.current_version_id) ?? versions[0] ?? null };
+      if (!cv) return null;
+
+      const { data: versions, error: versionsError } = await supabase
+        .from("cv_versions")
+        .select("id, version_no, label, file_path, file_type, parsed_data, analysis, created_at")
+        .eq("cv_id", cv.id)
+        .order("version_no", { ascending: false });
+      if (versionsError) throw versionsError;
+
+      const list = versions ?? [];
+      return { ...cv, versions: list, current: list.find((v) => v.id === cv.current_version_id) ?? list[0] ?? null };
     },
   });

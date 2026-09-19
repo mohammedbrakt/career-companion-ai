@@ -54,7 +54,10 @@ function CvPage() {
   }
 
   async function onFile(file: File) {
-    if (file.size > 10 * 1024 * 1024) return toast.error(t.cv.errors.generic);
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(t.cv.errors.generic);
+      return;
+    }
     setBusy("upload");
     setDraft(null);
     try {
