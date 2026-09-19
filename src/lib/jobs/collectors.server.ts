@@ -388,6 +388,34 @@ const adzuna: JobCollector = {
   },
 };
 
+/** ISO country codes JSearch expects; anything unknown falls back to Egypt. */
+const JSEARCH_COUNTRY_CODES: Record<string, string> = {
+  egypt: "eg",
+  مصر: "eg",
+  "saudi arabia": "sa",
+  ksa: "sa",
+  "united arab emirates": "ae",
+  uae: "ae",
+  qatar: "qa",
+  kuwait: "kw",
+  bahrain: "bh",
+  oman: "om",
+  jordan: "jo",
+  lebanon: "lb",
+  morocco: "ma",
+  tunisia: "tn",
+  algeria: "dz",
+  turkey: "tr",
+  "united kingdom": "gb",
+  uk: "gb",
+  "united states": "us",
+  usa: "us",
+  germany: "de",
+  netherlands: "nl",
+  canada: "ca",
+  remote: "us",
+};
+
 /** JSearch (RapidAPI) — Google-for-Jobs index: the widest local coverage, including Egypt. Needs JSEARCH_RAPIDAPI_KEY. */
 const jsearch: JobCollector = {
   key: "jsearch",
