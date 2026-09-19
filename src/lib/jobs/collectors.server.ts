@@ -3,6 +3,9 @@
  * A collector is a swappable adapter that fetches jobs from one source and returns RawJob[].
  * Add a new provider by implementing JobCollector and registering it in COLLECTORS;
  * nothing downstream (normalization, dedupe, matching) changes.
+ *
+ * Keyless sources always run. Key-based sources (Jooble, Adzuna, JSearch) only run when
+ * their secret is configured — that is what unlocks local (Egypt / Gulf / on-site) postings.
  */
 import type { RawJob } from "./normalize.server";
 
@@ -18,14 +21,43 @@ export type JobCollector = {
   key: string;
   name: string;
   kind: "api" | "feed";
+  /** True when the source needs a secret that is not configured yet. */
+  requiresKey?: boolean;
+  isEnabled?: () => boolean;
   collect: (ctx: CollectorContext) => Promise<RawJob[]>;
 };
 
-async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { accept: "application/json", "user-agent": "Shoghlni-JobCollector/1.0" } });
+const UA = "Shoghlni-JobCollector/1.0";
+
+function env(name: string): string | undefined {
+  const value = process.env[name];
+  return value && value.trim() ? value.trim() : undefined;
+}
+
+async function getJson(url: string, init?: RequestInit): Promise<unknown> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { accept: "application/json", "user-agent": UA, ...(init?.headers ?? {}) },
+  });
   if (!res.ok) throw new Error(`${url} responded ${res.status}`);
   return res.json();
 }
+
+async function getText(url: string): Promise<string> {
+  const res = await fetch(url, { headers: { "user-agent": UA } });
+  if (!res.ok) throw new Error(`${url} responded ${res.status}`);
+  return res.text();
+}
+
+/** Run per-query fetches in parallel; a failing query never kills the run. */
+async function fanOut<T>(queries: string[], fn: (query: string) => Promise<T[]>): Promise<T[]> {
+  const settled = await Promise.allSettled(queries.map((q) => fn(q)));
+  return settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []));
+}
+
+const str = (v: unknown): string => (v == null ? "" : String(v));
+
+/* ------------------------------------------------------------------ keyless */
 
 /** Remotive — remote jobs API (global, remote-first roles). */
 const remotive: JobCollector = {
@@ -33,38 +65,31 @@ const remotive: JobCollector = {
   name: "Remotive",
   kind: "api",
   collect: async (ctx) => {
-    const out: RawJob[] = [];
-    const queries = ctx.queries.length > 0 ? ctx.queries.slice(0, 6) : ["operations"];
-    for (const query of queries) {
-      try {
-        const data = (await getJson(
-          `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=${Math.min(ctx.limit, 40)}`,
-        )) as { jobs?: Array<Record<string, unknown>> };
-        for (const job of data.jobs ?? []) {
-          out.push({
-            source_name: "Remotive",
-            external_ref: String(job["id"]),
-            source_url: String(job["url"] ?? ""),
-            title: String(job["title"] ?? "").trim(),
-            company: String(job["company_name"] ?? "").trim(),
-            company_logo_url: (job["company_logo"] as string) || null,
-            location: String(job["candidate_required_location"] ?? "") || null,
-            remote: true,
-            employment_type: (job["job_type"] as string) ?? null,
-            industry: (job["category"] as string) ?? null,
-            description: (job["description"] as string) ?? null,
-            tags: Array.isArray(job["tags"]) ? (job["tags"] as string[]) : [],
-            salary_text: (job["salary"] as string) ?? null,
-            application_url: String(job["url"] ?? ""),
-            posted_at: (job["publication_date"] as string) ?? null,
-            raw: job,
-          });
-        }
-      } catch {
-        // one failing query must not kill the run
-      }
-    }
-    return out.filter((j) => j.title && j.company);
+    const queries = ctx.queries.length > 0 ? ctx.queries.slice(0, 10) : ["operations"];
+    const jobs = await fanOut(queries, async (query) => {
+      const data = (await getJson(
+        `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=${Math.min(ctx.limit, 50)}`,
+      )) as { jobs?: Array<Record<string, unknown>> };
+      return (data.jobs ?? []).map<RawJob>((job) => ({
+        source_name: "Remotive",
+        external_ref: str(job["id"]),
+        source_url: str(job["url"]),
+        title: str(job["title"]).trim(),
+        company: str(job["company_name"]).trim(),
+        company_logo_url: (job["company_logo"] as string) || null,
+        location: str(job["candidate_required_location"]) || null,
+        remote: true,
+        employment_type: (job["job_type"] as string) ?? null,
+        industry: (job["category"] as string) ?? null,
+        description: (job["description"] as string) ?? null,
+        tags: Array.isArray(job["tags"]) ? (job["tags"] as string[]) : [],
+        salary_text: (job["salary"] as string) ?? null,
+        application_url: str(job["url"]),
+        posted_at: (job["publication_date"] as string) ?? null,
+        raw: job,
+      }));
+    });
+    return jobs.filter((j) => j.title && j.company);
   },
 };
 
@@ -74,76 +99,373 @@ const arbeitnow: JobCollector = {
   name: "Arbeitnow",
   kind: "api",
   collect: async (ctx) => {
-    const out: RawJob[] = [];
-    try {
-      const data = (await getJson("https://www.arbeitnow.com/api/job-board-api")) as { data?: Array<Record<string, unknown>> };
-      const wanted = ctx.queries.map((q) => q.toLowerCase());
-      for (const job of data.data ?? []) {
-        const title = String(job["title"] ?? "").trim();
-        if (wanted.length > 0 && !wanted.some((q) => title.toLowerCase().includes(q.split(" ")[0] ?? q))) continue;
-        out.push({
-          source_name: "Arbeitnow",
-          external_ref: String(job["slug"]),
-          source_url: String(job["url"] ?? ""),
-          title,
-          company: String(job["company_name"] ?? "").trim(),
-          location: String(job["location"] ?? "") || null,
-          remote: Boolean(job["remote"]),
-          description: (job["description"] as string) ?? null,
-          tags: Array.isArray(job["tags"]) ? (job["tags"] as string[]) : [],
-          application_url: String(job["url"] ?? ""),
-          posted_at: job["created_at"] ? new Date(Number(job["created_at"]) * 1000).toISOString() : null,
-          raw: job,
-        });
-      }
-    } catch {
-      // source unavailable this run
-    }
-    return out.filter((j) => j.title && j.company).slice(0, ctx.limit);
+    const wanted = ctx.queries.map((q) => q.toLowerCase());
+    const pages = [1, 2, 3];
+    const jobs = await fanOut(pages.map(String), async (page) => {
+      const data = (await getJson(`https://www.arbeitnow.com/api/job-board-api?page=${page}`)) as {
+        data?: Array<Record<string, unknown>>;
+      };
+      return (data.data ?? []).map<RawJob>((job) => ({
+        source_name: "Arbeitnow",
+        external_ref: str(job["slug"]),
+        source_url: str(job["url"]),
+        title: str(job["title"]).trim(),
+        company: str(job["company_name"]).trim(),
+        location: str(job["location"]) || null,
+        remote: Boolean(job["remote"]),
+        description: (job["description"] as string) ?? null,
+        tags: Array.isArray(job["tags"]) ? (job["tags"] as string[]) : [],
+        application_url: str(job["url"]),
+        posted_at: job["created_at"] ? new Date(Number(job["created_at"]) * 1000).toISOString() : null,
+        raw: job,
+      }));
+    });
+    return jobs
+      .filter((j) => j.title && j.company)
+      .filter((j) => wanted.length === 0 || wanted.some((q) => matchesQuery(j.title, q)))
+      .slice(0, ctx.limit * 2);
   },
 };
 
-/** Jobicy — remote jobs feed with geo filtering. */
+/** Jobicy — remote jobs feed, queried per role title. */
 const jobicy: JobCollector = {
   key: "jobicy",
   name: "Jobicy",
   kind: "api",
   collect: async (ctx) => {
-    const out: RawJob[] = [];
-    try {
-      const data = (await getJson(`https://jobicy.com/api/v2/remote-jobs?count=${Math.min(ctx.limit, 50)}`)) as {
-        jobs?: Array<Record<string, unknown>>;
-      };
-      for (const job of data.jobs ?? []) {
-        out.push({
-          source_name: "Jobicy",
-          external_ref: String(job["id"]),
-          source_url: String(job["url"] ?? ""),
-          title: String(job["jobTitle"] ?? "").trim(),
-          company: String(job["companyName"] ?? "").trim(),
-          company_logo_url: (job["companyLogo"] as string) || null,
-          location: String(job["jobGeo"] ?? "") || null,
-          remote: true,
-          employment_type: Array.isArray(job["jobType"]) ? String((job["jobType"] as string[])[0]) : null,
-          industry: Array.isArray(job["jobIndustry"]) ? String((job["jobIndustry"] as string[])[0]) : null,
-          description: (job["jobDescription"] as string) ?? (job["jobExcerpt"] as string) ?? null,
-          salary_text:
-            job["annualSalaryMin"] && job["annualSalaryMax"]
-              ? `${job["annualSalaryMin"]} - ${job["annualSalaryMax"]} ${job["salaryCurrency"] ?? "USD"} per year`
-              : null,
-          application_url: String(job["url"] ?? ""),
-          posted_at: (job["pubDate"] as string) ?? null,
-          raw: job,
-        });
-      }
-    } catch {
-      // source unavailable this run
-    }
-    return out.filter((j) => j.title && j.company);
+    const queries = ctx.queries.length > 0 ? ctx.queries.slice(0, 8) : [""];
+    const jobs = await fanOut(queries, async (query) => {
+      const url = `https://jobicy.com/api/v2/remote-jobs?count=${Math.min(ctx.limit, 50)}${
+        query ? `&tag=${encodeURIComponent(query)}` : ""
+      }`;
+      const data = (await getJson(url)) as { jobs?: Array<Record<string, unknown>> };
+      return (data.jobs ?? []).map<RawJob>((job) => ({
+        source_name: "Jobicy",
+        external_ref: str(job["id"]),
+        source_url: str(job["url"]),
+        title: str(job["jobTitle"]).trim(),
+        company: str(job["companyName"]).trim(),
+        company_logo_url: (job["companyLogo"] as string) || null,
+        location: str(job["jobGeo"]) || null,
+        remote: true,
+        employment_type: Array.isArray(job["jobType"]) ? str((job["jobType"] as string[])[0]) : null,
+        industry: Array.isArray(job["jobIndustry"]) ? str((job["jobIndustry"] as string[])[0]) : null,
+        description: (job["jobDescription"] as string) ?? (job["jobExcerpt"] as string) ?? null,
+        salary_text:
+          job["annualSalaryMin"] && job["annualSalaryMax"]
+            ? `${job["annualSalaryMin"]} - ${job["annualSalaryMax"]} ${job["salaryCurrency"] ?? "USD"} per year`
+            : null,
+        application_url: str(job["url"]),
+        posted_at: (job["pubDate"] as string) ?? null,
+        raw: job,
+      }));
+    });
+    return jobs.filter((j) => j.title && j.company);
   },
 };
 
-export const COLLECTORS: JobCollector[] = [remotive, jobicy, arbeitnow];
+/** RemoteOK — large keyless remote board. */
+const remoteok: JobCollector = {
+  key: "remoteok",
+  name: "RemoteOK",
+  kind: "api",
+  collect: async (ctx) => {
+    const data = (await getJson("https://remoteok.com/api")) as Array<Record<string, unknown>>;
+    const wanted = ctx.queries.map((q) => q.toLowerCase());
+    return (Array.isArray(data) ? data : [])
+      .filter((job) => job["id"] && job["position"])
+      .map<RawJob>((job) => ({
+        source_name: "RemoteOK",
+        external_ref: str(job["id"]),
+        source_url: str(job["url"]),
+        title: str(job["position"]).trim(),
+        company: str(job["company"]).trim(),
+        company_logo_url: (job["company_logo"] as string) || null,
+        location: str(job["location"]) || null,
+        remote: true,
+        description: (job["description"] as string) ?? null,
+        tags: Array.isArray(job["tags"]) ? (job["tags"] as string[]) : [],
+        salary_text:
+          job["salary_min"] && job["salary_max"] ? `${job["salary_min"]} - ${job["salary_max"]} USD per year` : null,
+        application_url: str(job["apply_url"] || job["url"]),
+        posted_at: (job["date"] as string) ?? null,
+        raw: job,
+      }))
+      .filter((j) => j.title && j.company)
+      .filter((j) => wanted.length === 0 || wanted.some((q) => matchesQuery(j.title, q)));
+  },
+};
+
+/** Himalayas — keyless remote board with wide non-tech coverage. */
+const himalayas: JobCollector = {
+  key: "himalayas",
+  name: "Himalayas",
+  kind: "api",
+  collect: async (ctx) => {
+    const wanted = ctx.queries.map((q) => q.toLowerCase());
+    const offsets = [0, 50, 100];
+    const jobs = await fanOut(offsets.map(String), async (offset) => {
+      const data = (await getJson(`https://himalayas.app/jobs/api?limit=50&offset=${offset}`)) as {
+        jobs?: Array<Record<string, unknown>>;
+      };
+      return (data.jobs ?? []).map<RawJob>((job) => ({
+        source_name: "Himalayas",
+        external_ref: str(job["guid"] || job["applicationLink"]),
+        source_url: str(job["applicationLink"]),
+        title: str(job["title"]).trim(),
+        company: str(job["companyName"]).trim(),
+        company_logo_url: (job["companyLogo"] as string) || null,
+        location: Array.isArray(job["locationRestrictions"]) ? (job["locationRestrictions"] as string[]).join(", ") : null,
+        remote: true,
+        employment_type: (job["employmentType"] as string) ?? null,
+        description: (job["description"] as string) ?? (job["excerpt"] as string) ?? null,
+        tags: Array.isArray(job["categories"]) ? (job["categories"] as string[]) : [],
+        application_url: str(job["applicationLink"]),
+        posted_at: job["pubDate"] ? new Date(Number(job["pubDate"]) * 1000).toISOString() : null,
+        raw: job,
+      }));
+    });
+    return jobs
+      .filter((j) => j.title && j.company)
+      .filter((j) => wanted.length === 0 || wanted.some((q) => matchesQuery(j.title, q)));
+  },
+};
+
+/** We Work Remotely — public RSS feed. */
+const weworkremotely: JobCollector = {
+  key: "weworkremotely",
+  name: "We Work Remotely",
+  kind: "feed",
+  collect: async (ctx) => {
+    const xml = await getText("https://weworkremotely.com/remote-jobs.rss");
+    const wanted = ctx.queries.map((q) => q.toLowerCase());
+    const items = xml.split("<item>").slice(1);
+    const pick = (block: string, tag: string): string => {
+      const m = block.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+      if (!m) return "";
+      return m[1]!.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    };
+    return items
+      .map<RawJob>((block) => {
+        const rawTitle = pick(block, "title");
+        const [company, ...rest] = rawTitle.split(":");
+        const title = (rest.join(":") || rawTitle).trim();
+        const link = pick(block, "link");
+        return {
+          source_name: "We Work Remotely",
+          external_ref: link,
+          source_url: link,
+          title,
+          company: (company ?? "").trim(),
+          location: pick(block, "region") || "Remote",
+          remote: true,
+          description: pick(block, "description"),
+          application_url: link,
+          posted_at: pick(block, "pubDate") ? new Date(pick(block, "pubDate")).toISOString() : null,
+          raw: { title: rawTitle, link },
+        };
+      })
+      .filter((j) => j.title && j.company)
+      .filter((j) => wanted.length === 0 || wanted.some((q) => matchesQuery(j.title, q)));
+  },
+};
+
+/* ------------------------------------------------------- key-based (local jobs) */
+
+/** Jooble — aggregator with strong Egypt / MENA on-site coverage. Needs JOOBLE_API_KEY. */
+const jooble: JobCollector = {
+  key: "jooble",
+  name: "Jooble",
+  kind: "api",
+  requiresKey: true,
+  isEnabled: () => Boolean(env("JOOBLE_API_KEY")),
+  collect: async (ctx) => {
+    const key = env("JOOBLE_API_KEY");
+    if (!key) return [];
+    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 4) : ["Egypt"];
+    const queries = ctx.queries.slice(0, 6);
+    const pairs = queries.flatMap((q) => locations.map((loc) => `${q}||${loc}`));
+    const jobs = await fanOut(pairs, async (pair) => {
+      const [keywords, location] = pair.split("||");
+      const data = (await getJson(`https://jooble.org/api/${key}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ keywords, location, page: "1" }),
+      })) as { jobs?: Array<Record<string, unknown>> };
+      return (data.jobs ?? []).map<RawJob>((job) => ({
+        source_name: "Jooble",
+        external_ref: str(job["id"] || job["link"]),
+        source_url: str(job["link"]),
+        title: str(job["title"]).trim(),
+        company: str(job["company"]).trim() || "Confidential",
+        location: str(job["location"]) || location || null,
+        remote: /remote/i.test(str(job["title"]) + str(job["location"])),
+        employment_type: (job["type"] as string) ?? null,
+        description: (job["snippet"] as string) ?? null,
+        salary_text: (job["salary"] as string) ?? null,
+        application_url: str(job["link"]),
+        posted_at: (job["updated"] as string) ?? null,
+        raw: job,
+      }));
+    });
+    return jobs.filter((j) => j.title);
+  },
+};
+
+/** Adzuna — country-scoped board (includes AE, and many other markets). Needs ADZUNA_APP_ID + ADZUNA_APP_KEY. */
+const ADZUNA_COUNTRY_CODES: Record<string, string> = {
+  "united arab emirates": "ae",
+  uae: "ae",
+  "saudi arabia": "ae",
+  "united kingdom": "gb",
+  uk: "gb",
+  "united states": "us",
+  usa: "us",
+  germany: "de",
+  netherlands: "nl",
+  france: "fr",
+  spain: "es",
+  italy: "it",
+  poland: "pl",
+  canada: "ca",
+  australia: "au",
+  "south africa": "za",
+};
+
+const adzuna: JobCollector = {
+  key: "adzuna",
+  name: "Adzuna",
+  kind: "api",
+  requiresKey: true,
+  isEnabled: () => Boolean(env("ADZUNA_APP_ID") && env("ADZUNA_APP_KEY")),
+  collect: async (ctx) => {
+    const appId = env("ADZUNA_APP_ID");
+    const appKey = env("ADZUNA_APP_KEY");
+    if (!appId || !appKey) return [];
+    const codes = [
+      ...new Set(
+        (ctx.countries.length > 0 ? ctx.countries : ["United Arab Emirates"])
+          .map((c) => ADZUNA_COUNTRY_CODES[c.toLowerCase()])
+          .filter((c): c is string => Boolean(c)),
+      ),
+    ].slice(0, 3);
+    const queries = ctx.queries.slice(0, 5);
+    const pairs = codes.flatMap((code) => queries.map((q) => `${code}||${q}`));
+    const jobs = await fanOut(pairs, async (pair) => {
+      const [code, query] = pair.split("||");
+      const data = (await getJson(
+        `https://api.adzuna.com/v1/api/jobs/${code}/search/1?app_id=${appId}&app_key=${appKey}&results_per_page=50&what=${encodeURIComponent(
+          query ?? "",
+        )}&content-type=application/json`,
+      )) as { results?: Array<Record<string, unknown>> };
+      return (data.results ?? []).map<RawJob>((job) => {
+        const company = (job["company"] as Record<string, unknown> | undefined)?.["display_name"];
+        const location = (job["location"] as Record<string, unknown> | undefined)?.["display_name"];
+        return {
+          source_name: "Adzuna",
+          external_ref: str(job["id"]),
+          source_url: str(job["redirect_url"]),
+          title: str(job["title"]).replace(/<[^>]+>/g, "").trim(),
+          company: str(company).trim() || "Confidential",
+          location: str(location) || null,
+          remote: /remote/i.test(str(job["title"])),
+          employment_type: (job["contract_time"] as string) ?? null,
+          industry: str((job["category"] as Record<string, unknown> | undefined)?.["label"]) || null,
+          description: (job["description"] as string) ?? null,
+          salary_text:
+            job["salary_min"] && job["salary_max"] ? `${job["salary_min"]} - ${job["salary_max"]} per year` : null,
+          application_url: str(job["redirect_url"]),
+          posted_at: (job["created"] as string) ?? null,
+          raw: job,
+        };
+      });
+    });
+    return jobs.filter((j) => j.title && j.company);
+  },
+};
+
+/** JSearch (RapidAPI) — Google-for-Jobs index: the widest local coverage, including Egypt. Needs JSEARCH_RAPIDAPI_KEY. */
+const jsearch: JobCollector = {
+  key: "jsearch",
+  name: "JSearch",
+  kind: "api",
+  requiresKey: true,
+  isEnabled: () => Boolean(env("JSEARCH_RAPIDAPI_KEY")),
+  collect: async (ctx) => {
+    const key = env("JSEARCH_RAPIDAPI_KEY");
+    if (!key) return [];
+    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 3) : ["Egypt"];
+    const pairs = ctx.queries.slice(0, 6).flatMap((q) => locations.map((loc) => `${q} in ${loc}`));
+    const jobs = await fanOut(pairs, async (query) => {
+      const data = (await getJson(
+        `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(query)}&page=1&num_pages=2&date_posted=month`,
+        { headers: { "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" } },
+      )) as { data?: Array<Record<string, unknown>> };
+      return (data.data ?? []).map<RawJob>((job) => ({
+        source_name: "JSearch",
+        external_ref: str(job["job_id"]),
+        source_url: str(job["job_apply_link"]),
+        title: str(job["job_title"]).trim(),
+        company: str(job["employer_name"]).trim() || "Confidential",
+        company_logo_url: (job["employer_logo"] as string) || null,
+        location: [job["job_city"], job["job_country"]].filter(Boolean).map(str).join(", ") || null,
+        remote: Boolean(job["job_is_remote"]),
+        employment_type: (job["job_employment_type"] as string) ?? null,
+        description: (job["job_description"] as string) ?? null,
+        salary_text:
+          job["job_min_salary"] && job["job_max_salary"]
+            ? `${job["job_min_salary"]} - ${job["job_max_salary"]} ${job["job_salary_currency"] ?? "USD"} per ${
+                job["job_salary_period"] ?? "year"
+              }`
+            : null,
+        application_url: str(job["job_apply_link"]),
+        posted_at: (job["job_posted_at_datetime_utc"] as string) ?? null,
+        raw: job,
+      }));
+    });
+    return jobs.filter((j) => j.title);
+  },
+};
+
+/** Loose title match: every meaningful word of the query appears in the title. */
+function matchesQuery(title: string, query: string): boolean {
+  const t = title.toLowerCase();
+  const words = query
+    .toLowerCase()
+    .split(/[^a-z0-9+]+/)
+    .filter((w) => w.length > 2);
+  if (words.length === 0) return true;
+  const hits = words.filter((w) => t.includes(w)).length;
+  return hits >= Math.min(words.length, 1);
+}
+
+export const COLLECTORS: JobCollector[] = [
+  remotive,
+  jobicy,
+  arbeitnow,
+  remoteok,
+  himalayas,
+  weworkremotely,
+  jooble,
+  adzuna,
+  jsearch,
+];
+
+/** Only the sources that can actually run right now. */
+export function activeCollectors(): JobCollector[] {
+  return COLLECTORS.filter((c) => (c.isEnabled ? c.isEnabled() : true));
+}
+
+/** Names of key-based sources that are configured / still missing their secret. */
+export function collectorAvailability(): { enabled: string[]; missingKey: string[] } {
+  const enabled: string[] = [];
+  const missingKey: string[] = [];
+  for (const c of COLLECTORS) {
+    if (c.isEnabled ? c.isEnabled() : true) enabled.push(c.name);
+    else missingKey.push(c.name);
+  }
+  return { enabled, missingKey };
+}
 
 export function getCollector(key: string): JobCollector | undefined {
   return COLLECTORS.find((c) => c.key === key);
