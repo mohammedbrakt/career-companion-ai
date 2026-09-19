@@ -318,25 +318,15 @@ const jooble: JobCollector = {
   },
 };
 
-/** Adzuna — country-scoped board (includes AE, and many other markets). Needs ADZUNA_APP_ID + ADZUNA_APP_KEY. */
-const ADZUNA_COUNTRY_CODES: Record<string, string> = {
-  "united arab emirates": "ae",
-  uae: "ae",
-  "saudi arabia": "ae",
-  "united kingdom": "gb",
-  uk: "gb",
-  "united states": "us",
-  usa: "us",
-  germany: "de",
-  netherlands: "nl",
-  france: "fr",
-  spain: "es",
-  italy: "it",
-  poland: "pl",
-  canada: "ca",
-  australia: "au",
-  "south africa": "za",
-};
+/**
+ * Adzuna — strong local coverage in Europe, North America, Australia, India,
+ * South Africa and the UAE. Needs ADZUNA_APP_ID + ADZUNA_APP_KEY.
+ * Only these markets exist on Adzuna; other countries are served by JSearch.
+ */
+const ADZUNA_MARKETS = new Set([
+  "at", "au", "be", "br", "ca", "ch", "de", "es", "fr", "gb", "in", "it",
+  "mx", "nl", "nz", "pl", "sg", "us", "za", "ae",
+]);
 
 const adzuna: JobCollector = {
   key: "adzuna",
