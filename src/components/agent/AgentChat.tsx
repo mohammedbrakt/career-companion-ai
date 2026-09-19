@@ -139,12 +139,12 @@ export function AgentChat({ threadId, initialMessages }: Props) {
                       };
                       const name = toolPart.type.replace(/^tool-/, "");
                       const Icon = TOOL_ICONS[name] ?? Wrench;
-                      void Icon;
                       return (
                         <Tool key={i} defaultOpen={false} className="my-2">
                           <ToolHeader
                             type={toolPart.type as `tool-${string}`}
                             state={toolPart.state}
+                            icon={<Icon className="size-4 text-primary" />}
                             title={name.replace(/_/g, " ")}
                           />
                           <ToolContent>
