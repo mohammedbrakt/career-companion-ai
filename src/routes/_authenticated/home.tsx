@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { NextActionCard } from "@/components/agent/NextActionCard";
 
 export const Route = createFileRoute("/_authenticated/home")({
   head: () => ({
@@ -79,7 +80,9 @@ function HomePage() {
             </Link>
           </Button>
         </section>
-      ) : null}
+      ) : (
+        <NextActionCard userId={user.id} />
+      )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {dash.isLoading ? (
