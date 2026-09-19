@@ -188,9 +188,10 @@ export function createAgentTools(supabase: DB, userId: string) {
         let ingestion;
         try {
           ingestion = await runIngestion(supabaseAdmin, undefined, {
-            queries: cleaned,
+            queries: expanded,
             countries: searchCountries,
             limit: 50,
+            strict: true,
           });
         } catch (error) {
           return fail(error instanceof Error ? error.message : "The external sources could not be reached right now.");
