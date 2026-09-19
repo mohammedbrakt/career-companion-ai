@@ -8,6 +8,7 @@
  * their secret is configured — that is what unlocks local (Egypt / Gulf / on-site) postings.
  */
 import type { RawJob } from "./normalize.server";
+import { relevanceScore } from "./expand.server";
 
 export type CollectorContext = {
   /** Free-text queries derived from users' target roles. */
@@ -15,6 +16,8 @@ export type CollectorContext = {
   /** ISO country names users are targeting. */
   countries: string[];
   limit: number;
+  /** Targeted (deep) search: drop postings that do not really answer the queries. */
+  strict?: boolean;
 };
 
 export type JobCollector = {
@@ -286,8 +289,9 @@ const jooble: JobCollector = {
   collect: async (ctx) => {
     const key = env("JOOBLE_API_KEY");
     if (!key) return [];
-    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 4) : ["Egypt"];
-    const queries = ctx.queries.slice(0, 6);
+    // Empty location = worldwide on Jooble, the right default for a global user base.
+    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 4) : [""];
+    const queries = ctx.queries.slice(0, ctx.strict ? 10 : 6);
     const pairs = queries.flatMap((q) => locations.map((loc) => `${q}||${loc}`));
     const jobs = await fanOut(pairs, async (pair) => {
       const [keywords, location] = pair.split("||");
@@ -316,25 +320,15 @@ const jooble: JobCollector = {
   },
 };
 
-/** Adzuna — country-scoped board (includes AE, and many other markets). Needs ADZUNA_APP_ID + ADZUNA_APP_KEY. */
-const ADZUNA_COUNTRY_CODES: Record<string, string> = {
-  "united arab emirates": "ae",
-  uae: "ae",
-  "saudi arabia": "ae",
-  "united kingdom": "gb",
-  uk: "gb",
-  "united states": "us",
-  usa: "us",
-  germany: "de",
-  netherlands: "nl",
-  france: "fr",
-  spain: "es",
-  italy: "it",
-  poland: "pl",
-  canada: "ca",
-  australia: "au",
-  "south africa": "za",
-};
+/**
+ * Adzuna — strong local coverage in Europe, North America, Australia, India,
+ * South Africa and the UAE. Needs ADZUNA_APP_ID + ADZUNA_APP_KEY.
+ * Only these markets exist on Adzuna; other countries are served by JSearch.
+ */
+const ADZUNA_MARKETS = new Set([
+  "at", "au", "be", "br", "ca", "ch", "de", "es", "fr", "gb", "in", "it",
+  "mx", "nl", "nz", "pl", "sg", "us", "za", "ae",
+]);
 
 const adzuna: JobCollector = {
   key: "adzuna",
@@ -348,12 +342,12 @@ const adzuna: JobCollector = {
     if (!appId || !appKey) return [];
     const codes = [
       ...new Set(
-        (ctx.countries.length > 0 ? ctx.countries : ["United Arab Emirates"])
-          .map((c) => ADZUNA_COUNTRY_CODES[c.toLowerCase()])
-          .filter((c): c is string => Boolean(c)),
+        (ctx.countries.length > 0 ? ctx.countries : ["United States", "United Kingdom"])
+          .map((c) => countryCode(c))
+          .filter((c) => ADZUNA_MARKETS.has(c)),
       ),
     ].slice(0, 3);
-    const queries = ctx.queries.slice(0, 5);
+    const queries = ctx.queries.slice(0, ctx.strict ? 10 : 5);
     const pairs = codes.flatMap((code) => queries.map((q) => `${code}||${q}`));
     const jobs = await fanOut(pairs, async (pair) => {
       const [code, query] = pair.split("||");
@@ -388,33 +382,39 @@ const adzuna: JobCollector = {
   },
 };
 
-/** ISO country codes JSearch expects; anything unknown falls back to Egypt. */
-const JSEARCH_COUNTRY_CODES: Record<string, string> = {
-  egypt: "eg",
-  مصر: "eg",
-  "saudi arabia": "sa",
-  ksa: "sa",
-  "united arab emirates": "ae",
-  uae: "ae",
-  qatar: "qa",
-  kuwait: "kw",
-  bahrain: "bh",
-  oman: "om",
-  jordan: "jo",
-  lebanon: "lb",
-  morocco: "ma",
-  tunisia: "tn",
-  algeria: "dz",
-  turkey: "tr",
-  "united kingdom": "gb",
-  uk: "gb",
-  "united states": "us",
-  usa: "us",
-  germany: "de",
-  netherlands: "nl",
-  canada: "ca",
-  remote: "us",
+/**
+ * Worldwide country codes. Users are not only in the Arab world — Europe, the
+ * Americas, Asia and Africa all resolve here, so the same deep search serves
+ * everyone. Unknown names fall back to a worldwide (US-indexed) search.
+ */
+const COUNTRY_CODES: Record<string, string> = {
+  // MENA
+  egypt: "eg", مصر: "eg", "saudi arabia": "sa", ksa: "sa", السعودية: "sa",
+  "united arab emirates": "ae", uae: "ae", الإمارات: "ae", qatar: "qa", kuwait: "kw",
+  bahrain: "bh", oman: "om", jordan: "jo", lebanon: "lb", iraq: "iq",
+  morocco: "ma", tunisia: "tn", algeria: "dz", libya: "ly", sudan: "sd", turkey: "tr", israel: "il",
+  // Europe
+  "united kingdom": "gb", uk: "gb", england: "gb", ireland: "ie", germany: "de", deutschland: "de",
+  netherlands: "nl", holland: "nl", france: "fr", spain: "es", portugal: "pt", italy: "it",
+  belgium: "be", switzerland: "ch", austria: "at", sweden: "se", norway: "no", denmark: "dk",
+  finland: "fi", poland: "pl", "czech republic": "cz", czechia: "cz", romania: "ro", greece: "gr",
+  hungary: "hu", ukraine: "ua", bulgaria: "bg", croatia: "hr", serbia: "rs", estonia: "ee",
+  lithuania: "lt", latvia: "lv", luxembourg: "lu", slovakia: "sk", slovenia: "si",
+  // Americas
+  "united states": "us", usa: "us", us: "us", america: "us", canada: "ca", mexico: "mx",
+  brazil: "br", argentina: "ar", chile: "cl", colombia: "co", peru: "pe",
+  // Asia-Pacific & Africa
+  india: "in", pakistan: "pk", bangladesh: "bd", philippines: "ph", indonesia: "id",
+  malaysia: "my", singapore: "sg", "hong kong": "hk", japan: "jp", "south korea": "kr",
+  china: "cn", vietnam: "vn", thailand: "th", australia: "au", "new zealand": "nz",
+  "south africa": "za", nigeria: "ng", kenya: "ke", ghana: "gh", ethiopia: "et",
+  // Remote / worldwide
+  remote: "us", worldwide: "us", anywhere: "us", global: "us",
 };
+
+export function countryCode(name: string): string {
+  return COUNTRY_CODES[name.trim().toLowerCase()] ?? "us";
+}
 
 /** JSearch (RapidAPI) — Google-for-Jobs index: the widest local coverage, including Egypt. Needs JSEARCH_RAPIDAPI_KEY. */
 const jsearch: JobCollector = {
@@ -426,16 +426,20 @@ const jsearch: JobCollector = {
   collect: async (ctx) => {
     const key = env("JSEARCH_RAPIDAPI_KEY");
     if (!key) return [];
-    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 3) : ["Egypt"];
-    const pairs = ctx.queries.slice(0, 6).flatMap((q) => locations.map((loc) => ({ query: `${q} in ${loc}`, loc })));
+    // No target country means the person is open anywhere: search remote worldwide.
+    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 3) : ["Remote"];
+    const maxQueries = ctx.strict ? 12 : 6;
+    const pairs = ctx.queries
+      .slice(0, maxQueries)
+      .flatMap((q) => locations.map((loc) => ({ query: /remote|worldwide|anywhere/i.test(loc) ? `${q} remote` : `${q} in ${loc}`, loc })));
     const jobs = await fanOut(pairs, async ({ query, loc }) => {
-      const code = JSEARCH_COUNTRY_CODES[loc.trim().toLowerCase()] ?? "eg";
+      const code = countryCode(loc);
       // The live endpoint is /search-v2 (the docs' /search path is retired) and it
       // returns { data: { jobs: [...] } }.
       const data = (await getJson(
         `https://jsearch.p.rapidapi.com/search-v2?query=${encodeURIComponent(
           query,
-        )}&country=${code}&language=en&num_pages=2&date_posted=month`,
+        )}&country=${code}&language=en&num_pages=${ctx.strict ? 3 : 2}&date_posted=month`,
         { headers: { "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" } },
       )) as { data?: { jobs?: Array<Record<string, unknown>> } | Array<Record<string, unknown>> };
       const raw = Array.isArray(data.data) ? data.data : (data.data?.jobs ?? []);
@@ -464,43 +468,14 @@ const jsearch: JobCollector = {
 };
 
 /**
- * Relevance filter. Generic seniority words ("manager", "senior") match everything,
- * so a title only counts when it shares a distinctive word with the query
- * ("supply", "chain", "logistics", "planning"...).
+ * Relevance filter — shared with the ingestion gate so a board result and a
+ * stored job are judged by exactly the same rule.
  */
-const GENERIC_WORDS = new Set([
-  "manager",
-  "senior",
-  "junior",
-  "lead",
-  "head",
-  "director",
-  "officer",
-  "specialist",
-  "executive",
-  "assistant",
-  "associate",
-  "coordinator",
-  "supervisor",
-  "engineer",
-  "analyst",
-  "consultant",
-  "the",
-  "and",
-  "for",
-  "remote",
-]);
 
 export function matchesQuery(title: string, query: string): boolean {
-  const t = title.toLowerCase();
-  const words = query
-    .toLowerCase()
-    .split(/[^a-z0-9+]+/)
-    .filter((w) => w.length > 2);
-  if (words.length === 0) return true;
-  const distinctive = words.filter((w) => !GENERIC_WORDS.has(w));
-  const required = distinctive.length > 0 ? distinctive : words;
-  return required.some((w) => t.includes(w));
+  // Half of the query's distinctive words must appear in the title — one shared
+  // word ("manager", "remote") is not a match.
+  return relevanceScore(title, [query]) >= 0.5;
 }
 
 export const COLLECTORS: JobCollector[] = [
