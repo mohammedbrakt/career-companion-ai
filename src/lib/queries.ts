@@ -111,7 +111,7 @@ export const jobsFeedQuery = (userId: string, search: string) =>
     queryFn: async () => {
       let q = supabase
         .from("user_job_matches")
-        .select("id, score, status, strengths, gaps, job:jobs!inner(id, title, company, city, country, work_arrangement, posted_at, last_verified_at, status)")
+        .select("id, score, status, strengths, gaps, job:jobs!inner(id, title, company, city, country, work_arrangement, posted_at, last_verified_at, status, application_url)")
         .eq("user_id", userId)
         .eq("eligible", true)
         .not("status", "in", "(skipped,hidden)")
