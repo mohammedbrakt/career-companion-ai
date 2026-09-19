@@ -468,32 +468,9 @@ const jsearch: JobCollector = {
 };
 
 /**
- * Relevance filter. Generic seniority words ("manager", "senior") match everything,
- * so a title only counts when it shares a distinctive word with the query
- * ("supply", "chain", "logistics", "planning"...).
+ * Relevance filter — shared with the ingestion gate so a board result and a
+ * stored job are judged by exactly the same rule.
  */
-const GENERIC_WORDS = new Set([
-  "manager",
-  "senior",
-  "junior",
-  "lead",
-  "head",
-  "director",
-  "officer",
-  "specialist",
-  "executive",
-  "assistant",
-  "associate",
-  "coordinator",
-  "supervisor",
-  "engineer",
-  "analyst",
-  "consultant",
-  "the",
-  "and",
-  "for",
-  "remote",
-]);
 
 export function matchesQuery(title: string, query: string): boolean {
   // Half of the query's distinctive words must appear in the title — one shared
