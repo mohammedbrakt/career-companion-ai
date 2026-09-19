@@ -50,7 +50,7 @@ async function getText(url: string): Promise<string> {
 }
 
 /** Run per-query fetches in parallel; a failing query never kills the run. */
-async function fanOut<T>(queries: string[], fn: (query: string) => Promise<T[]>): Promise<T[]> {
+async function fanOut<T, Q = string>(queries: Q[], fn: (query: Q) => Promise<T[]>): Promise<T[]> {
   const settled = await Promise.allSettled(queries.map((q) => fn(q)));
   return settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []));
 }
@@ -388,6 +388,34 @@ const adzuna: JobCollector = {
   },
 };
 
+/** ISO country codes JSearch expects; anything unknown falls back to Egypt. */
+const JSEARCH_COUNTRY_CODES: Record<string, string> = {
+  egypt: "eg",
+  مصر: "eg",
+  "saudi arabia": "sa",
+  ksa: "sa",
+  "united arab emirates": "ae",
+  uae: "ae",
+  qatar: "qa",
+  kuwait: "kw",
+  bahrain: "bh",
+  oman: "om",
+  jordan: "jo",
+  lebanon: "lb",
+  morocco: "ma",
+  tunisia: "tn",
+  algeria: "dz",
+  turkey: "tr",
+  "united kingdom": "gb",
+  uk: "gb",
+  "united states": "us",
+  usa: "us",
+  germany: "de",
+  netherlands: "nl",
+  canada: "ca",
+  remote: "us",
+};
+
 /** JSearch (RapidAPI) — Google-for-Jobs index: the widest local coverage, including Egypt. Needs JSEARCH_RAPIDAPI_KEY. */
 const jsearch: JobCollector = {
   key: "jsearch",
@@ -399,35 +427,39 @@ const jsearch: JobCollector = {
     const key = env("JSEARCH_RAPIDAPI_KEY");
     if (!key) return [];
     const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 3) : ["Egypt"];
-    const pairs = ctx.queries.slice(0, 6).flatMap((q) => locations.map((loc) => `${q} in ${loc}`));
-    const jobs = await fanOut(pairs, async (query) => {
+    const pairs = ctx.queries.slice(0, 6).flatMap((q) => locations.map((loc) => ({ query: `${q} in ${loc}`, loc })));
+    const jobs = await fanOut(pairs, async ({ query, loc }) => {
+      const code = JSEARCH_COUNTRY_CODES[loc.trim().toLowerCase()] ?? "eg";
+      // The live endpoint is /search-v2 (the docs' /search path is retired) and it
+      // returns { data: { jobs: [...] } }.
       const data = (await getJson(
-        `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(query)}&page=1&num_pages=2&date_posted=month`,
+        `https://jsearch.p.rapidapi.com/search-v2?query=${encodeURIComponent(
+          query,
+        )}&country=${code}&language=en&num_pages=2&date_posted=month`,
         { headers: { "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" } },
-      )) as { data?: Array<Record<string, unknown>> };
-      return (data.data ?? []).map<RawJob>((job) => ({
+      )) as { data?: { jobs?: Array<Record<string, unknown>> } | Array<Record<string, unknown>> };
+      const raw = Array.isArray(data.data) ? data.data : (data.data?.jobs ?? []);
+      return raw.map<RawJob>((job) => ({
         source_name: "JSearch",
-        external_ref: str(job["job_id"]),
+        external_ref: str(job["job_uid"]) || str(job["job_id"]),
         source_url: str(job["job_apply_link"]),
         title: str(job["job_title"]).trim(),
         company: str(job["employer_name"]).trim() || "Confidential",
         company_logo_url: (job["employer_logo"] as string) || null,
-        location: [job["job_city"], job["job_country"]].filter(Boolean).map(str).join(", ") || null,
+        location:
+          [job["job_city"], job["job_state"], job["job_country"]].filter(Boolean).map(str).join(", ") ||
+          str(job["job_location"]).split("•")[0]?.trim() ||
+          loc,
         remote: Boolean(job["job_is_remote"]),
         employment_type: (job["job_employment_type"] as string) ?? null,
         description: (job["job_description"] as string) ?? null,
-        salary_text:
-          job["job_min_salary"] && job["job_max_salary"]
-            ? `${job["job_min_salary"]} - ${job["job_max_salary"]} ${job["job_salary_currency"] ?? "USD"} per ${
-                job["job_salary_period"] ?? "year"
-              }`
-            : null,
+        salary_text: (job["job_salary_string"] as string) ?? null,
         application_url: str(job["job_apply_link"]),
         posted_at: (job["job_posted_at_datetime_utc"] as string) ?? null,
         raw: job,
       }));
     });
-    return jobs.filter((j) => j.title);
+    return jobs.filter((j) => j.title && j.application_url);
   },
 };
 
