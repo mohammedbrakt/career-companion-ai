@@ -3,7 +3,7 @@ import { streamText, Output } from "ai";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { createResponsesProvider, MODELS, getLovableApiKey } from "@/lib/ai-gateway.server";
+import { createLovableAiGatewayRunIdFetch, createResponsesProvider, MODELS } from "@/lib/ai-gateway.server";
 import { clampCvText, extractDocumentText, UnsupportedCvFileError } from "@/lib/cv/extract.server";
 import { computeProfileStrength, parsedCvSchema, type ParsedCv } from "@/lib/cv/schema";
 
@@ -19,8 +19,7 @@ HARD RULES
 - Write analysis text in the same language as the CV.`;
 
 async function parseCvText(rawText: string): Promise<ParsedCv> {
-  const key = getLovableApiKey();
-  const lovable = createResponsesProvider(key);
+  const lovable = createResponsesProvider(createLovableAiGatewayRunIdFetch());
 
   const result = streamText({
     model: lovable.responses(MODELS.reasoning),
