@@ -340,12 +340,12 @@ const adzuna: JobCollector = {
     if (!appId || !appKey) return [];
     const codes = [
       ...new Set(
-        (ctx.countries.length > 0 ? ctx.countries : ["United Arab Emirates"])
-          .map((c) => ADZUNA_COUNTRY_CODES[c.toLowerCase()])
-          .filter((c): c is string => Boolean(c)),
+        (ctx.countries.length > 0 ? ctx.countries : ["United States", "United Kingdom"])
+          .map((c) => countryCode(c))
+          .filter((c) => ADZUNA_MARKETS.has(c)),
       ),
     ].slice(0, 3);
-    const queries = ctx.queries.slice(0, 5);
+    const queries = ctx.queries.slice(0, ctx.strict ? 10 : 5);
     const pairs = codes.flatMap((code) => queries.map((q) => `${code}||${q}`));
     const jobs = await fanOut(pairs, async (pair) => {
       const [code, query] = pair.split("||");
