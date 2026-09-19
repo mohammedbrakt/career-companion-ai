@@ -154,3 +154,21 @@ export const cvsQuery = (userId: string) =>
       return data;
     },
   });
+
+export const masterCvQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ["master-cv", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cvs")
+        .select("id, title, updated_at, current_version_id, versions:cv_versions(id, version_no, label, file_path, file_type, parsed_data, analysis, created_at)")
+        .eq("user_id", userId)
+        .eq("kind", "master")
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const versions = [...(data.versions ?? [])].sort((a, b) => b.version_no - a.version_no);
+      return { ...data, versions, current: versions.find((v) => v.id === data.current_version_id) ?? versions[0] ?? null };
+    },
+  });
