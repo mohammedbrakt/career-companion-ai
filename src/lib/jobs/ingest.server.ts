@@ -5,7 +5,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { COLLECTORS, type CollectorContext } from "./collectors.server";
+import { activeCollectors, COLLECTORS, type CollectorContext } from "./collectors.server";
 import { normalizeJob, type NormalizedJob } from "./normalize.server";
 
 type DB = SupabaseClient<Database>;
@@ -22,7 +22,7 @@ export type IngestResult = {
 /** Validation — a job must be complete and plausible enough to show to a human. */
 function isValid(job: NormalizedJob): boolean {
   if (job.title.length < 3 || job.company.length < 2) return false;
-  if (!job.description || job.description.length < 120) return false;
+  if (!job.description || job.description.length < 60) return false;
   if (!job.application_url) return false;
   if (job.posted_at) {
     const age = Date.now() - new Date(job.posted_at).getTime();
@@ -65,17 +65,27 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
     limit: ctxOverride?.limit ?? base.limit,
   };
   const result: IngestResult = { collected: 0, inserted: 0, duplicates: 0, rejected: 0, expired: 0, perSource: {} };
-  const collectors = collectorKeys?.length ? COLLECTORS.filter((c) => collectorKeys.includes(c.key)) : COLLECTORS;
+  const collectors = collectorKeys?.length
+    ? COLLECTORS.filter((c) => collectorKeys.includes(c.key) && (c.isEnabled ? c.isEnabled() : true))
+    : activeCollectors();
   const now = new Date().toISOString();
 
-  for (const collector of collectors) {
-    let raws: Awaited<ReturnType<typeof collector.collect>> = [];
-    let status = "ok";
-    try {
-      raws = await collector.collect(ctx);
-    } catch (error) {
-      status = error instanceof Error ? error.message.slice(0, 200) : "failed";
-    }
+  // All sources are queried at once — a deep search must not wait for them one by one.
+  const harvest = await Promise.all(
+    collectors.map(async (collector) => {
+      try {
+        return { collector, raws: await collector.collect(ctx), status: "ok" };
+      } catch (error) {
+        return {
+          collector,
+          raws: [] as Awaited<ReturnType<typeof collector.collect>>,
+          status: error instanceof Error ? error.message.slice(0, 200) : "failed",
+        };
+      }
+    }),
+  );
+
+  for (const { collector, raws, status } of harvest) {
     result.collected += raws.length;
     result.perSource[collector.key] = raws.length;
 
