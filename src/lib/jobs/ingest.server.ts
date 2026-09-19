@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { activeCollectors, COLLECTORS, type CollectorContext } from "./collectors.server";
 import { normalizeJob, type NormalizedJob } from "./normalize.server";
+import { relevanceScore } from "./expand.server";
 
 type DB = SupabaseClient<Database>;
 
@@ -115,6 +116,7 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
     queries: ctxOverride?.queries?.length ? ctxOverride.queries : base.queries,
     countries: ctxOverride?.countries ?? base.countries,
     limit: ctxOverride?.limit ?? base.limit,
+    strict: ctxOverride?.strict ?? false,
   };
   const result: IngestResult = { collected: 0, inserted: 0, duplicates: 0, rejected: 0, expired: 0, perSource: {} };
   const collectors = collectorKeys?.length
@@ -144,6 +146,12 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
       .map((raw) => ({ collector, raw, job: normalizeJob(raw) }))
       .filter(({ job }) => {
         if (!isValid(job)) {
+          result.rejected++;
+          return false;
+        }
+        // Relevance gate: in a targeted (deep) search, a posting must actually
+        // answer one of the searched roles, not merely come back from the board.
+        if (ctx.strict && relevanceScore(job.title, ctx.queries) < 0.5) {
           result.rejected++;
           return false;
         }

@@ -15,6 +15,8 @@ export type CollectorContext = {
   /** ISO country names users are targeting. */
   countries: string[];
   limit: number;
+  /** Targeted (deep) search: drop postings that do not really answer the queries. */
+  strict?: boolean;
 };
 
 export type JobCollector = {
