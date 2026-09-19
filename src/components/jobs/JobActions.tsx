@@ -67,13 +67,37 @@ export function JobActions({ jobId, userId, size = "default" }: { jobId: string;
     invalidate();
   };
 
+  const onOneClick = async () => {
+    setApplying(true);
+    try {
+      const res = await interested({ data: { jobId } });
+      track("job_interested", { job_id: jobId });
+      if (!res.applicationId) throw new Error("no_application");
+      try {
+        await prepare({ data: { applicationId: res.applicationId } });
+        track("application_prepared", { application_id: res.applicationId });
+      } catch (error) {
+        toast.error(error instanceof Error && error.message === "no_master_cv" ? t.cv.noCvBody : t.auth.genericError);
+      }
+      invalidate();
+      void navigate({ to: "/applications/$applicationId", params: { applicationId: res.applicationId } });
+    } catch {
+      toast.error(t.auth.genericError);
+    } finally {
+      setApplying(false);
+    }
+  };
+
   const h = size === "sm" ? "h-9" : "h-12";
 
   return (
     <>
-      <div className="flex gap-2">
-        <Button className={`${h} flex-1 rounded-2xl`} disabled={busy} onClick={onInterested}>
-          <Check className="size-4" /> {t.jobs.interested}
+      <div className="flex flex-wrap gap-2">
+        <Button className={`${h} flex-1 rounded-2xl`} disabled={applying} onClick={() => void onOneClick()}>
+          <Sparkles className="size-4" /> {applying ? t.jobs.oneClickBusy : t.jobs.oneClick}
+        </Button>
+        <Button variant="outline" className={`${h} rounded-2xl`} disabled={busy} onClick={onInterested} aria-label={t.jobs.interested}>
+          <Check className="size-4" />
         </Button>
         <Button variant="outline" className={`${h} rounded-2xl`} onClick={onSave} aria-label={t.jobs.save}>
           <Bookmark className="size-4" />
