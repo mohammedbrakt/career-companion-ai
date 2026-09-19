@@ -154,6 +154,56 @@ export function createAgentTools(supabase: DB, userId: string) {
       },
     }),
 
+    deep_search_jobs: tool({
+      description:
+        "Deep search: go out to the live external job sources right now with specific role queries, pull fresh postings into the verified jobs database, re-score them for this user, and return the best results. Use this when search_jobs finds nothing good, or when the user asks for a deeper/wider/new search. It takes up to a minute, so tell the user you are searching before calling it. Queries should be plain job titles, e.g. ['supply chain manager','logistics manager'].",
+      inputSchema: z.object({
+        queries: z.array(z.string()),
+        countries: z.array(z.string()).nullable(),
+        min_score: z.number().nullable(),
+      }),
+      execute: async ({ queries, countries, min_score }) => {
+        const cleaned = [...new Set(queries.map((q) => q.trim()).filter(Boolean))].slice(0, 6);
+        if (cleaned.length === 0) return fail("Give at least one role title to search for.");
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { runIngestion } = await import("@/lib/jobs/ingest.server");
+        const { computeMatchesForUser } = await import("@/lib/matching/run.server");
+
+        let ingestion;
+        try {
+          ingestion = await runIngestion(supabaseAdmin, undefined, {
+            queries: cleaned,
+            countries: countries ?? [],
+            limit: 50,
+          });
+        } catch (error) {
+          return fail(error instanceof Error ? error.message : "The external sources could not be reached right now.");
+        }
+        await computeMatchesForUser(supabase, userId);
+
+        const { data: matches } = await supabase
+          .from("user_job_matches")
+          .select("job_id, score, eligible, strengths, gaps, recommendation, jobs(id, title, company, country, city, work_arrangement, salary_min, salary_max, salary_currency, posted_at)")
+          .eq("user_id", userId)
+          .eq("eligible", true)
+          .gte("score", min_score ?? 0)
+          .order("score", { ascending: false })
+          .limit(8);
+
+        return ok({
+          searched: cleaned,
+          sources: ingestion.perSource,
+          new_jobs: ingestion.inserted,
+          already_known: ingestion.duplicates,
+          top_matches: matches ?? [],
+          note:
+            (matches ?? []).length === 0
+              ? "Nothing eligible came back from the live sources for these queries. Suggest different role titles or a wider location."
+              : null,
+        });
+      },
+    }),
+
     search_jobs: tool({
       description:
         "Search the verified central jobs database, newest first, with the user's match score when it has been computed. Pass null to skip a filter.",
