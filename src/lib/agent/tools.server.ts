@@ -169,6 +169,9 @@ export function createAgentTools(supabase: DB, userId: string) {
         const { runIngestion } = await import("@/lib/jobs/ingest.server");
         const { computeMatchesForUser } = await import("@/lib/matching/run.server");
         const { collectorAvailability } = await import("@/lib/jobs/collectors.server");
+        const { expandQueries } = await import("@/lib/jobs/expand.server");
+        // One title is never how employers write it — search the whole family in parallel.
+        const expanded = expandQueries(cleaned, 14);
 
         // Widen the net: add the user's own saved target countries when none were given.
         let searchCountries = countries ?? [];
