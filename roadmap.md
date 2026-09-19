@@ -19,11 +19,11 @@
 - [ ] Seed `subscription_plans` (4 tiers) + trial assignment on signup
 
 ## Phase 1 — MVP core
-- [ ] Agent streaming chat (AI Elements, `/api/chat`, tool calling, DB-persisted threads/messages)
-- [ ] Agent state machine + one-next-action engine
+- [x] Agent streaming chat (AI Elements, `/api/chat`, tool calling, DB-persisted threads/messages)
+- [~] Agent state machine (agent_states written by `set_agent_state`); one-next-action buttons still to add
 - [ ] Conversational onboarding (track detection, preferences, CV ask)
 - [ ] CV upload → parse → Master CV + Career Profile + missing-info questions
-- [ ] Career Brain memory read/write tools
+- [x] Career Brain memory read/write tools (`remember_fact`, snapshot injected into every turn)
 - [ ] Target Role Engine (primary/secondary suggestions, approve/remove)
 - [ ] CJDE: collector interface, normalization, fingerprint dedupe, freshness validation (cron)
 - [ ] Eligibility filters + Matching Engine (score, breakdown, strengths, gaps, cached per job)
