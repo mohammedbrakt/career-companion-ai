@@ -73,3 +73,6 @@
 - [x] Relevance filter on titles (distinctive words, not generic 'manager')
 - [x] deep_search_jobs reports sources searched, per-source counts, duration, and which local aggregators are not connected
 - [ ] Local/on-site MENA coverage: Jooble (JOOBLE_API_KEY), JSearch/Google Jobs (JSEARCH_RAPIDAPI_KEY), Adzuna (ADZUNA_APP_ID + ADZUNA_APP_KEY) — collectors implemented, waiting on API keys
+
+## Deferred — user asked to be reminded later
+- [ ] Email domain setup → enables agent-sent applications by email (one-approve send, no copy/paste). User said "remind me later" on 2026-09-19 — raise it again in a future session.
