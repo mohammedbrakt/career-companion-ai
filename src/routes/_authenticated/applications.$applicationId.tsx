@@ -67,14 +67,21 @@ function ApplicationDetail() {
         .eq("user_id", user.id)
         .single();
       if (app.error) throw app.error;
-      const [events, version, interviews] = await Promise.all([
+      const [events, version, interviews, profile] = await Promise.all([
         supabase.from("application_events").select("*").eq("application_id", applicationId).order("occurred_at", { ascending: false }),
         app.data.cv_version_id
           ? supabase.from("cv_versions").select("id, version_no, content").eq("id", app.data.cv_version_id).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from("interviews").select("id, prep, scheduled_at").eq("application_id", applicationId),
+        supabase.from("profiles").select("full_name, email, phone, city, country, headline").eq("user_id", user.id).maybeSingle(),
       ]);
-      return { app: app.data, events: events.data ?? [], version: version.data, interviews: interviews.data ?? [] };
+      return {
+        app: app.data,
+        events: events.data ?? [],
+        version: version.data,
+        interviews: interviews.data ?? [],
+        profile: profile.data,
+      };
     },
   });
 
