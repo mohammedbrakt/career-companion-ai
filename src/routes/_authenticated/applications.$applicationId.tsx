@@ -144,6 +144,20 @@ function ApplicationDetail() {
     }
   };
 
+  const { firstName, lastName } = splitName(profile?.full_name ?? "");
+  const bookmarklet = buildAutofillBookmarklet({
+    fullName: profile?.full_name ?? "",
+    firstName,
+    lastName,
+    email: profile?.email ?? "",
+    phone: profile?.phone ?? "",
+    city: profile?.city ?? "",
+    country: profile?.country ?? "",
+    headline: prepared?.headline ?? profile?.headline ?? "",
+    coverLetter: prepared?.cover_letter ?? "",
+    answers: prepared?.answers ?? [],
+  });
+
   const onDownload = () => {
     const ok = printApplicationDocuments({
       fullName: profile?.full_name ?? "",
