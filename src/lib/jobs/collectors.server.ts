@@ -50,7 +50,7 @@ async function getText(url: string): Promise<string> {
 }
 
 /** Run per-query fetches in parallel; a failing query never kills the run. */
-async function fanOut<T>(queries: string[], fn: (query: string) => Promise<T[]>): Promise<T[]> {
+async function fanOut<T, Q = string>(queries: Q[], fn: (query: Q) => Promise<T[]>): Promise<T[]> {
   const settled = await Promise.allSettled(queries.map((q) => fn(q)));
   return settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []));
 }
