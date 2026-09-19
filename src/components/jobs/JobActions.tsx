@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Bookmark, ExternalLink, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { saveJob, skipJob } from "@/lib/jobs.functions";
+import { markInterested, saveJob, skipJob } from "@/lib/jobs.functions";
 import { prepareApplication } from "@/lib/applications.functions";
 import { useI18n } from "@/lib/i18n/context";
 import { track } from "@/lib/analytics";
@@ -36,6 +36,7 @@ export function JobActions({
   const [open, setOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const prepare = useServerFn(prepareApplication);
+  const interested = useServerFn(markInterested);
   const save = useServerFn(saveJob);
   const skip = useServerFn(skipJob);
 
