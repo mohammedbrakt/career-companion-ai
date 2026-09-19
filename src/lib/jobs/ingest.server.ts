@@ -57,8 +57,13 @@ async function expireStaleJobs(admin: DB): Promise<number> {
   return data?.length ?? 0;
 }
 
-export async function runIngestion(admin: DB, collectorKeys?: string[]): Promise<IngestResult> {
-  const ctx = await buildContext(admin);
+export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverride?: Partial<CollectorContext>): Promise<IngestResult> {
+  const base = await buildContext(admin);
+  const ctx: CollectorContext = {
+    queries: ctxOverride?.queries?.length ? ctxOverride.queries : base.queries,
+    countries: ctxOverride?.countries ?? base.countries,
+    limit: ctxOverride?.limit ?? base.limit,
+  };
   const result: IngestResult = { collected: 0, inserted: 0, duplicates: 0, rejected: 0, expired: 0, perSource: {} };
   const collectors = collectorKeys?.length ? COLLECTORS.filter((c) => collectorKeys.includes(c.key)) : COLLECTORS;
   const now = new Date().toISOString();
