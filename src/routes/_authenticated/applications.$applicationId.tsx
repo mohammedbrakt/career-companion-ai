@@ -129,6 +129,36 @@ function ApplicationDetail() {
     refresh();
   };
 
+  const copy = (text: string) => {
+    void navigator.clipboard.writeText(text);
+    toast.success(t.applications.copied);
+  };
+
+  const onApplied = async () => {
+    track("application_submitted", { application_id: applicationId });
+    if (app.stage !== "applied") {
+      await setStage({ data: { applicationId, stage: "applied", note: null, closedReason: null } });
+      toast.success(t.applications.appliedMarked);
+      refresh();
+    }
+  };
+
+  const onDownload = () => {
+    const ok = printApplicationDocuments({
+      fullName: profile?.full_name ?? "",
+      contact: [profile?.email, profile?.phone, [profile?.city, profile?.country].filter(Boolean).join(", ")].filter(Boolean).join(" · "),
+      jobTitle: app.job?.title ?? "",
+      company: app.job?.company ?? "",
+      headline: prepared?.headline ?? profile?.headline ?? undefined,
+      summary: prepared?.summary ?? undefined,
+      skills: prepared?.highlighted_skills ?? undefined,
+      bullets: prepared?.tailored_bullets ?? undefined,
+      coverLetter: prepared?.cover_letter ?? undefined,
+      dir,
+    });
+    if (!ok) toast.error(t.applications.popupBlocked);
+  };
+
   return (
     <div className="space-y-5">
       <Link to="/applications" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
