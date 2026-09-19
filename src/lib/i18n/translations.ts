@@ -110,6 +110,13 @@ const en = {
     popupBlocked: "Allow pop-ups to download the file.",
     noApplyLink: "This job has no direct application link. Everything is ready below — send it to the employer yourself.",
     appliedMarked: "Marked as applied. Your agent keeps tracking it.",
+    autofillTitle: "Fill the form for me",
+    autofillHow:
+      "Drag the button below to your bookmarks bar once. Then, on any employer application page, click it and your details, cover letter and answers are typed in for you — you only attach your CV and press Submit.",
+    autofillButton: "Shoghlni auto-fill",
+    autofillDragHint: "Drag me to the bookmarks bar",
+    emailApply: "Send by email",
+    emailFound: (address: string) => `Employer email found: ${address}`,
   },
   agent: {
     title: "AI Agent",
@@ -341,6 +348,13 @@ const ar: Dictionary = {
     popupBlocked: "اسمح بالنوافذ المنبثقة لتحميل الملف.",
     noApplyLink: "لا يوجد رابط تقديم مباشر لهذه الوظيفة. كل شيء جاهز بالأسفل — أرسله لصاحب العمل بنفسك.",
     appliedMarked: "تم تسجيل التقديم. وكيلك سيتابعها.",
+    autofillTitle: "املأ النموذج بدلاً عني",
+    autofillHow:
+      "اسحب الزر التالي إلى شريط المفضلة مرة واحدة. بعدها، في أي صفحة تقديم لأي شركة، اضغط عليه فيتم كتابة بياناتك وخطاب التقديم والإجابات تلقائياً — أنت فقط ترفق سيرتك وتضغط إرسال.",
+    autofillButton: "تعبئة شغلني التلقائية",
+    autofillDragHint: "اسحبني إلى شريط المفضلة",
+    emailApply: "أرسل بالبريد",
+    emailFound: (address: string) => `بريد صاحب العمل: ${address}`,
   },
   agent: {
     title: "الوكيل الذكي",

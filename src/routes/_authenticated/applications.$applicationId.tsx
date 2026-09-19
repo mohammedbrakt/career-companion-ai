@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Sparkle, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Sparkle, User, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { prepareApplication, prepareInterview, setApplicationStage } from "@/lib/applications.functions";
 import { printApplicationDocuments } from "@/lib/cv/print";
+import { buildAutofillBookmarklet, splitName } from "@/lib/apply/autofill";
 import { track } from "@/lib/analytics";
 import { StageBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -143,6 +144,20 @@ function ApplicationDetail() {
     }
   };
 
+  const { firstName, lastName } = splitName(profile?.full_name ?? "");
+  const bookmarklet = buildAutofillBookmarklet({
+    fullName: profile?.full_name ?? "",
+    firstName,
+    lastName,
+    email: profile?.email ?? "",
+    phone: profile?.phone ?? "",
+    city: profile?.city ?? "",
+    country: profile?.country ?? "",
+    headline: prepared?.headline ?? profile?.headline ?? "",
+    coverLetter: prepared?.cover_letter ?? "",
+    answers: prepared?.answers ?? [],
+  });
+
   const onDownload = () => {
     const ok = printApplicationDocuments({
       fullName: profile?.full_name ?? "",
@@ -219,6 +234,22 @@ function ApplicationDetail() {
             <Button variant="ghost" className="h-12 rounded-2xl" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
               <FileText className="size-4" /> {t.applications.prepare}
             </Button>
+          </div>
+        )}
+
+        {prepared && (
+          <div className="rounded-2xl border border-dashed border-border p-4">
+            <div className="text-sm font-bold">{t.applications.autofillTitle}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{t.applications.autofillHow}</p>
+            <a
+              href={bookmarklet}
+              draggable
+              onClick={(e) => e.preventDefault()}
+              title={t.applications.autofillDragHint}
+              className="mt-3 inline-flex h-11 cursor-grab items-center gap-2 rounded-2xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-soft"
+            >
+              <Wand2 className="size-4" /> {t.applications.autofillButton}
+            </a>
           </div>
         )}
       </section>
