@@ -67,3 +67,9 @@
 - [ ] Direct employer API application integrations (mode enum ready)
 - [ ] Voice agent (architecture seam ready)
 - [ ] Career roadmap, gap analyzer, salary intelligence (Phase 4)
+
+## Deep search (updated)
+- [x] Live sources expanded: Remotive, Jobicy, Arbeitnow, RemoteOK, Himalayas, We Work Remotely (keyless) — all queried in parallel, multi-page
+- [x] Relevance filter on titles (distinctive words, not generic 'manager')
+- [x] deep_search_jobs reports sources searched, per-source counts, duration, and which local aggregators are not connected
+- [ ] Local/on-site MENA coverage: Jooble (JOOBLE_API_KEY), JSearch/Google Jobs (JSEARCH_RAPIDAPI_KEY), Adzuna (ADZUNA_APP_ID + ADZUNA_APP_KEY) — collectors implemented, waiting on API keys
