@@ -45,3 +45,25 @@
 
 ## Phase 4
 - [ ] Career Roadmap, Gap Analyzer, Salary Intelligence, Fresh Graduate micro-lessons
+
+
+## Update — CJDE, matching, applications, plans, admin
+
+- [x] Job collection endpoint `/api/public/collect-jobs` (secret-header auth, CJDE_CRON_SECRET)
+- [x] Collectors (remotive, jobicy, arbeitnow) + normalization + dedupe + freshness
+- [x] Matching engine with hard eligibility filters + per-dimension breakdown
+- [x] Jobs list: search, filters (work mode, country, min score), sort, discover
+- [x] Job actions: Interested / Save / Skip with reason -> Career Brain + feedback
+- [x] Applications: list + Kanban board + detail with timeline (agent/user/employer)
+- [x] Application preparation (tailored CV, cover letter, answers) + interview prep
+- [x] Subscription plans seeded (free_trial/basic/pro/premium, prices per country in plan_prices)
+- [x] Free trial started automatically for every new user
+- [x] Target role approve/remove UI, plan card on Profile
+- [x] One-next-action card on Home driven by agent_states
+- [x] Admin dashboard (has_role('admin') gated): users, jobs, applications, interviews, AI usage, collectors
+
+### Remaining (need external providers / later phases)
+- [ ] Payment provider integration (architecture + plan/price tables ready)
+- [ ] Direct employer API application integrations (mode enum ready)
+- [ ] Voice agent (architecture seam ready)
+- [ ] Career roadmap, gap analyzer, salary intelligence (Phase 4)
