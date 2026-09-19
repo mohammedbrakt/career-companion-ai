@@ -65,7 +65,7 @@ for(var i=0;i<els.length;i++){
 }
 var b=document.createElement("div");
 b.textContent=n+" fields filled by Shoghlni — check them, attach your CV, then submit.";
-b.setAttribute("style","position:fixed;z-index:999999;inset-inline:16px;bottom:16px;background:#0f2murder;background:#0f244a;color:#fff;font:14px system-ui;padding:12px 16px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35)");
+b.setAttribute("style","position:fixed;z-index:999999;inset-inline:16px;bottom:16px;background:#0f244a;color:#fff;font:14px system-ui;padding:12px 16px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35)");
 document.body.appendChild(b);
 setTimeout(function(){b.remove()},6000);
 })()`;
