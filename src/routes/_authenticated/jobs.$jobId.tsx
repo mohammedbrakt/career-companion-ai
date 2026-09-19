@@ -1,11 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { MatchScore } from "@/components/shared/MatchScore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { JobActions } from "@/components/jobs/JobActions";
 
@@ -112,13 +111,8 @@ function JobDetail() {
         </section>
       )}
 
-      <div className="sticky bottom-24 space-y-2 md:static">
-        <JobActions jobId={job.id} userId={user.id} />
-        {job.application_url && (
-          <Button asChild variant="outline" className="h-11 w-full rounded-2xl">
-            <a href={job.application_url} target="_blank" rel="noreferrer"><ExternalLink className="size-4" /> {t.jobs.view}</a>
-          </Button>
-        )}
+      <div className="sticky bottom-24 md:static">
+        <JobActions jobId={job.id} userId={user.id} applicationUrl={job.application_url} />
       </div>
     </div>
   );

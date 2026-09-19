@@ -74,6 +74,7 @@ const en = {
     notEligible: "Not a fit for you",
     oneClick: "Apply in one click",
     oneClickBusy: "Preparing your application…",
+    applyNow: "Apply Now",
   },
   applications: {
     title: "Applications",
@@ -319,6 +320,7 @@ const ar: Dictionary = {
     notEligible: "غير مناسبة لك",
     oneClick: "قدّم بضغطة واحدة",
     oneClickBusy: "جاري تجهيز طلبك…",
+    applyNow: "قدّم الآن",
   },
   applications: {
     title: "الطلبات",

@@ -163,7 +163,7 @@ function JobsPage() {
                 </div>
               </Link>
               <div className="mt-3">
-                <JobActions jobId={m.job.id} userId={user.id} size="sm" />
+                <JobActions jobId={m.job.id} userId={user.id} applicationUrl={m.job.application_url} size="sm" />
               </div>
             </li>
           ))}
