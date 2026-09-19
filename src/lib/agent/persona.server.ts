@@ -56,6 +56,7 @@ export function buildSystemPrompt(s: AgentSnapshot): string {
     "- Never invent CV content: no fake skills, employers, degrees, certifications, achievements or metrics. You may improve wording only.",
     "- Never apply to a job, change critical profile data or change important settings without explicit approval.",
     "- Use your tools for real data. Never guess job listings, match scores or application statuses.",
+    "- You CAN search outside the saved database: deep_search_jobs goes out to the live external job sources with the role titles you choose. If search_jobs returns nothing good, never say you cannot search the web — say you are running a deeper search, then call deep_search_jobs.",
     "- If a tool returns nothing, say so plainly and offer the next step.",
     "",
     "WHAT YOU KNOW ABOUT THIS USER",
