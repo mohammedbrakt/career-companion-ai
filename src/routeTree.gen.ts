@@ -20,6 +20,7 @@ import { Route as AuthResetRouteImport } from './routes/auth.reset'
 import { Route as AuthenticatedAgentIndexRouteImport } from './routes/_authenticated/agent.index'
 import { Route as AuthenticatedAgentThreadIdRouteImport } from './routes/_authenticated/agent.$threadId'
 import { Route as AuthenticatedApplicationsIndexRouteImport } from './routes/_authenticated/applications.index'
+import { Route as AuthenticatedApplicationsApplicationIdRouteImport } from './routes/_authenticated/applications.$applicationId'
 import { Route as AuthenticatedJobsIndexRouteImport } from './routes/_authenticated/jobs.index'
 import { Route as AuthenticatedJobsJobIdRouteImport } from './routes/_authenticated/jobs.$jobId'
 import { Route as ApiPublicCollectJobsRouteImport } from './routes/api/public/collect-jobs'
@@ -80,6 +81,12 @@ const AuthenticatedApplicationsIndexRoute =
     path: '/applications/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedApplicationsApplicationIdRoute =
+  AuthenticatedApplicationsApplicationIdRouteImport.update({
+    id: '/applications/$applicationId',
+    path: '/applications/$applicationId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedJobsIndexRoute = AuthenticatedJobsIndexRouteImport.update({
   id: '/jobs/',
   path: '/jobs/',
@@ -105,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/auth/reset': typeof AuthResetRoute
   '/agent/$threadId': typeof AuthenticatedAgentThreadIdRoute
+  '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/jobs/$jobId': typeof AuthenticatedJobsJobIdRoute
   '/api/public/collect-jobs': typeof ApiPublicCollectJobsRoute
   '/agent/': typeof AuthenticatedAgentIndexRoute
@@ -120,6 +128,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/auth/reset': typeof AuthResetRoute
   '/agent/$threadId': typeof AuthenticatedAgentThreadIdRoute
+  '/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/jobs/$jobId': typeof AuthenticatedJobsJobIdRoute
   '/api/public/collect-jobs': typeof ApiPublicCollectJobsRoute
   '/agent': typeof AuthenticatedAgentIndexRoute
@@ -137,6 +146,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/auth/reset': typeof AuthResetRoute
   '/_authenticated/agent/$threadId': typeof AuthenticatedAgentThreadIdRoute
+  '/_authenticated/applications/$applicationId': typeof AuthenticatedApplicationsApplicationIdRoute
   '/_authenticated/jobs/$jobId': typeof AuthenticatedJobsJobIdRoute
   '/api/public/collect-jobs': typeof ApiPublicCollectJobsRoute
   '/_authenticated/agent/': typeof AuthenticatedAgentIndexRoute
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/reset'
     | '/agent/$threadId'
+    | '/applications/$applicationId'
     | '/jobs/$jobId'
     | '/api/public/collect-jobs'
     | '/agent/'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/reset'
     | '/agent/$threadId'
+    | '/applications/$applicationId'
     | '/jobs/$jobId'
     | '/api/public/collect-jobs'
     | '/agent'
@@ -185,6 +197,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/reset'
     | '/_authenticated/agent/$threadId'
+    | '/_authenticated/applications/$applicationId'
     | '/_authenticated/jobs/$jobId'
     | '/api/public/collect-jobs'
     | '/_authenticated/agent/'
@@ -279,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedApplicationsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/applications/$applicationId': {
+      id: '/_authenticated/applications/$applicationId'
+      path: '/applications/$applicationId'
+      fullPath: '/applications/$applicationId'
+      preLoaderRoute: typeof AuthenticatedApplicationsApplicationIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/jobs/': {
       id: '/_authenticated/jobs/'
       path: '/jobs'
@@ -308,6 +328,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedAgentThreadIdRoute: typeof AuthenticatedAgentThreadIdRoute
+  AuthenticatedApplicationsApplicationIdRoute: typeof AuthenticatedApplicationsApplicationIdRoute
   AuthenticatedJobsJobIdRoute: typeof AuthenticatedJobsJobIdRoute
   AuthenticatedAgentIndexRoute: typeof AuthenticatedAgentIndexRoute
   AuthenticatedApplicationsIndexRoute: typeof AuthenticatedApplicationsIndexRoute
@@ -319,6 +340,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedAgentThreadIdRoute: AuthenticatedAgentThreadIdRoute,
+  AuthenticatedApplicationsApplicationIdRoute:
+    AuthenticatedApplicationsApplicationIdRoute,
   AuthenticatedJobsJobIdRoute: AuthenticatedJobsJobIdRoute,
   AuthenticatedAgentIndexRoute: AuthenticatedAgentIndexRoute,
   AuthenticatedApplicationsIndexRoute: AuthenticatedApplicationsIndexRoute,
