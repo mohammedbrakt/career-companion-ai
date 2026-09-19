@@ -18,7 +18,7 @@ export type AnalyticsEvent =
   | "subscription_cancelled";
 
 /** Fire-and-forget product analytics (stored in analytics_events). */
-export async function track(name: AnalyticsEvent, properties: Record<string, unknown> = {}) {
+export async function track(name: AnalyticsEvent, properties: Record<string, string | number | boolean | null> = {}) {
   try {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;

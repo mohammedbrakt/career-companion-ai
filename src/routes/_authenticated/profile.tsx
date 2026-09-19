@@ -32,7 +32,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
   );
 }
 
-function Row({ label, value }: { label: string; value?: string | null }) {
+function Row({ label, value }: { label: string; value?: string | null | undefined }) {
   const { t } = useI18n();
   return (
     <div className="flex items-center justify-between gap-4 py-2 text-sm">
