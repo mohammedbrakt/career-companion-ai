@@ -31,6 +31,58 @@ function isValid(job: NormalizedJob): boolean {
   return true;
 }
 
+const DIRECT_ATS_HOSTS = ["greenhouse.io", "lever.co", "workable.com", "ashbyhq.com"];
+
+function isDirectAts(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return DIRECT_ATS_HOSTS.some((a) => host.endsWith(a));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Boards hand out their own redirect links (remotive.com/…, jobicy.com/…), which
+ * hide the employer's real system (often Greenhouse or Lever). Following the
+ * redirect once at collection time is what makes true one-click apply visible.
+ */
+async function resolveRedirect(url: string, timeoutMs = 6000): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ShoghlniBot/1.0; +https://shoghlni.app)" },
+    });
+    if (res.url && res.url.startsWith("http")) return res.url;
+  } catch {
+    // Network hiccups keep the original link — never worse than before.
+  } finally {
+    clearTimeout(timer);
+  }
+  return url;
+}
+
+/** Resolve redirect links to their final destination, a small pool at a time. */
+async function resolveApplicationUrls(urls: string[], maxResolves = 120): Promise<Map<string, string>> {
+  const targets = [...new Set(urls.filter((u) => u && !isDirectAts(u)))].slice(0, maxResolves);
+  const resolved = new Map<string, string>();
+  const CONCURRENCY = 10;
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: CONCURRENCY }, async () => {
+      while (next < targets.length) {
+        const url = targets[next++]!;
+        const final = await resolveRedirect(url);
+        if (final !== url) resolved.set(url, final);
+      }
+    }),
+  );
+  return resolved;
+}
+
 async function buildContext(admin: DB): Promise<CollectorContext> {
   const [targets, prefs] = await Promise.all([
     admin.from("career_targets").select("title").neq("status", "removed").limit(200),
