@@ -137,35 +137,49 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
     }),
   );
 
-  for (const { collector, raws, status } of harvest) {
-    result.collected += raws.length;
-    result.perSource[collector.key] = raws.length;
+  // Normalize + validate everything first, then resolve redirect links once —
+  // so dedupe and insertion all use the employer's real application URL.
+  const pending = harvest.flatMap(({ collector, raws }) =>
+    raws
+      .map((raw) => ({ collector, raw, job: normalizeJob(raw) }))
+      .filter(({ job }) => {
+        if (!isValid(job)) {
+          result.rejected++;
+          return false;
+        }
+        return true;
+      }),
+  );
+  const resolvedUrls = await resolveApplicationUrls(pending.map(({ job }) => job.application_url));
+
+  for (const { collector, raw, job: normalized } of pending) {
+    const finalUrl = resolvedUrls.get(normalized.application_url) ?? normalized.application_url;
+    const job = finalUrl !== normalized.application_url ? { ...normalized, application_url: finalUrl } : normalized;
+    result.collected++;
+    result.perSource[collector.key] = (result.perSource[collector.key] ?? 0) + 1;
 
     // Register the collector row (swappable provider registry).
     const { data: collectorRow } = await admin
       .from("job_collectors")
       .upsert(
-        { name: collector.name, kind: collector.kind, is_active: true, last_run_at: now, last_status: status, config: { key: collector.key }, stats: { last_collected: raws.length } },
+        { name: collector.name, kind: collector.kind, is_active: true, last_run_at: now, last_status: "ok", config: { key: collector.key }, stats: { last_collected: result.perSource[collector.key] } },
         { onConflict: "name" },
       )
       .select("id")
       .maybeSingle();
 
-    for (const raw of raws) {
-      const job = normalizeJob(raw);
-      if (!isValid(job)) {
-        result.rejected++;
-        continue;
-      }
+    // Deduplication — one canonical job record, many sources.
+    const existing = await admin.from("jobs").select("id, application_url").eq("fingerprint", job.fingerprint).maybeSingle();
+    let jobId = existing.data?.id ?? null;
 
-      // Deduplication — one canonical job record, many sources.
-      const existing = await admin.from("jobs").select("id").eq("fingerprint", job.fingerprint).maybeSingle();
-      let jobId = existing.data?.id ?? null;
-
-      if (jobId) {
-        result.duplicates++;
-        await admin.from("jobs").update({ last_verified_at: now, status: "active" }).eq("id", jobId);
-      } else {
+    if (jobId) {
+      result.duplicates++;
+      const urlChanged = job.application_url !== existing.data?.application_url;
+      await admin
+        .from("jobs")
+        .update(urlChanged ? { last_verified_at: now, status: "active", application_url: job.application_url } : { last_verified_at: now, status: "active" })
+        .eq("id", jobId);
+    } else {
         const { data: created, error } = await admin
           .from("jobs")
           .insert({
