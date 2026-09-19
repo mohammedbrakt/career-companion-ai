@@ -89,7 +89,9 @@ const remotive: JobCollector = {
         raw: job,
       }));
     });
-    return jobs.filter((j) => j.title && j.company);
+    return jobs
+      .filter((j) => j.title && j.company)
+      .filter((j) => queries.every((q) => !q) || queries.some((q) => matchesQuery(j.title, q)));
   },
 };
 
@@ -160,7 +162,9 @@ const jobicy: JobCollector = {
         raw: job,
       }));
     });
-    return jobs.filter((j) => j.title && j.company);
+    return jobs
+      .filter((j) => j.title && j.company)
+      .filter((j) => queries.every((q) => !q) || queries.some((q) => matchesQuery(j.title, q)));
   },
 };
 
@@ -427,16 +431,44 @@ const jsearch: JobCollector = {
   },
 };
 
-/** Loose title match: every meaningful word of the query appears in the title. */
-function matchesQuery(title: string, query: string): boolean {
+/**
+ * Relevance filter. Generic seniority words ("manager", "senior") match everything,
+ * so a title only counts when it shares a distinctive word with the query
+ * ("supply", "chain", "logistics", "planning"...).
+ */
+const GENERIC_WORDS = new Set([
+  "manager",
+  "senior",
+  "junior",
+  "lead",
+  "head",
+  "director",
+  "officer",
+  "specialist",
+  "executive",
+  "assistant",
+  "associate",
+  "coordinator",
+  "supervisor",
+  "engineer",
+  "analyst",
+  "consultant",
+  "the",
+  "and",
+  "for",
+  "remote",
+]);
+
+export function matchesQuery(title: string, query: string): boolean {
   const t = title.toLowerCase();
   const words = query
     .toLowerCase()
     .split(/[^a-z0-9+]+/)
     .filter((w) => w.length > 2);
   if (words.length === 0) return true;
-  const hits = words.filter((w) => t.includes(w)).length;
-  return hits >= Math.min(words.length, 1);
+  const distinctive = words.filter((w) => !GENERIC_WORDS.has(w));
+  const required = distinctive.length > 0 ? distinctive : words;
+  return required.some((w) => t.includes(w));
 }
 
 export const COLLECTORS: JobCollector[] = [
