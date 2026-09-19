@@ -51,6 +51,22 @@ export const agentStateQuery = (userId: string) =>
     },
   });
 
+export const subscriptionQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ["subscription", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("*, plan:subscription_plans(code, tier, name, limits)")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
 export const dashboardQuery = (userId: string) =>
   queryOptions({
     queryKey: ["dashboard", userId],
