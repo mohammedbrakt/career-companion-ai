@@ -72,8 +72,9 @@ const en = {
     interestedDone: "Added to your applications. Your agent will prepare it.",
     prepare: "Prepare application",
     notEligible: "Not a fit for you",
-    oneClick: "Apply in one click",
-    oneClickBusy: "Preparing your application…",
+    oneClick: "One Click Apply",
+    oneClickBusy: "Applying for you…",
+    oneClickTag: "1-click apply",
     applyNow: "Apply Now",
   },
   applications: {
@@ -318,8 +319,9 @@ const ar: Dictionary = {
     interestedDone: "تمت الإضافة إلى طلباتك. وكيلك سيجهّزها.",
     prepare: "جهّز الطلب",
     notEligible: "غير مناسبة لك",
-    oneClick: "قدّم بضغطة واحدة",
-    oneClickBusy: "جاري تجهيز طلبك…",
+    oneClick: "تقديم بضغطة واحدة",
+    oneClickBusy: "نقدّم عنك الآن…",
+    oneClickTag: "تقديم بضغطة",
     applyNow: "قدّم الآن",
   },
   applications: {
