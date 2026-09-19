@@ -434,16 +434,20 @@ const jsearch: JobCollector = {
   collect: async (ctx) => {
     const key = env("JSEARCH_RAPIDAPI_KEY");
     if (!key) return [];
-    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 3) : ["Egypt"];
-    const pairs = ctx.queries.slice(0, 6).flatMap((q) => locations.map((loc) => ({ query: `${q} in ${loc}`, loc })));
+    // No target country means the person is open anywhere: search remote worldwide.
+    const locations = ctx.countries.length > 0 ? ctx.countries.slice(0, 3) : ["Remote"];
+    const maxQueries = ctx.strict ? 12 : 6;
+    const pairs = ctx.queries
+      .slice(0, maxQueries)
+      .flatMap((q) => locations.map((loc) => ({ query: /remote|worldwide|anywhere/i.test(loc) ? `${q} remote` : `${q} in ${loc}`, loc })));
     const jobs = await fanOut(pairs, async ({ query, loc }) => {
-      const code = JSEARCH_COUNTRY_CODES[loc.trim().toLowerCase()] ?? "eg";
+      const code = countryCode(loc);
       // The live endpoint is /search-v2 (the docs' /search path is retired) and it
       // returns { data: { jobs: [...] } }.
       const data = (await getJson(
         `https://jsearch.p.rapidapi.com/search-v2?query=${encodeURIComponent(
           query,
-        )}&country=${code}&language=en&num_pages=2&date_posted=month`,
+        )}&country=${code}&language=en&num_pages=${ctx.strict ? 3 : 2}&date_posted=month`,
         { headers: { "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" } },
       )) as { data?: { jobs?: Array<Record<string, unknown>> } | Array<Record<string, unknown>> };
       const raw = Array.isArray(data.data) ? data.data : (data.data?.jobs ?? []);
