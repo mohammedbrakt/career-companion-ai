@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import type { UIMessage } from "ai";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n/context";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgentChat } from "@/components/agent/AgentChat";
 
 export const Route = createFileRoute("/_authenticated/agent/$threadId")({
   head: () => ({
@@ -20,7 +22,6 @@ export const Route = createFileRoute("/_authenticated/agent/$threadId")({
   component: ThreadPage,
 });
 
-/** Thread shell. The streaming chat UI (AI Elements + tools) is the next module. */
 function ThreadPage() {
   const { threadId } = Route.useParams();
   const { t, dir } = useI18n();
@@ -29,10 +30,23 @@ function ThreadPage() {
   const thread = useQuery({
     queryKey: ["conversation", threadId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("conversations").select("id, title, kind").eq("id", threadId).single();
-      if (error) throw error;
-      return data;
+      const [conv, msgs] = await Promise.all([
+        supabase.from("conversations").select("id, title, kind").eq("id", threadId).single(),
+        supabase.from("messages").select("id, role, parts, client_message_id, created_at").eq("conversation_id", threadId).order("created_at"),
+      ]);
+      if (conv.error) throw conv.error;
+      if (msgs.error) throw msgs.error;
+      const history: UIMessage[] = (msgs.data ?? [])
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({
+          id: m.client_message_id ?? m.id,
+          role: m.role as "user" | "assistant",
+          parts: (Array.isArray(m.parts) ? m.parts : []) as UIMessage["parts"],
+        }));
+      return { conversation: conv.data, history };
     },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
   return (
@@ -43,14 +57,18 @@ function ThreadPage() {
         </Link>
         <BrandMark size={28} />
         <div className="min-w-0 flex-1 truncate font-bold">
-          {thread.isLoading ? <Skeleton className="h-4 w-32" /> : (thread.data?.title ?? t.agent.untitled)}
+          {thread.isLoading ? <Skeleton className="h-4 w-32" /> : (thread.data?.conversation?.title ?? t.agent.untitled)}
         </div>
       </header>
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <BrandMark size={56} className="opacity-80" />
-        <h2 className="mt-4 text-lg font-extrabold">{t.agent.welcomeTitle}</h2>
-        <p className="mt-1 max-w-xs text-sm text-muted-foreground">{t.agent.welcomeBody}</p>
-      </div>
+
+      {thread.isLoading ? (
+        <div className="flex-1 space-y-4 p-6">
+          <Skeleton className="h-16 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+      ) : (
+        <AgentChat key={threadId} threadId={threadId} initialMessages={thread.data?.history ?? []} />
+      )}
     </div>
   );
 }
