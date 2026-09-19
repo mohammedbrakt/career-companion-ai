@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Briefcase, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
+import { Briefcase, RefreshCw, Search, SlidersHorizontal, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { jobsFeedQuery } from "@/lib/queries";
 import { discoverJobs } from "@/lib/jobs.functions";
+import { detectAts } from "@/lib/apply/ats";
 import { MatchScore } from "@/components/shared/MatchScore";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { JobActions } from "@/components/jobs/JobActions";
