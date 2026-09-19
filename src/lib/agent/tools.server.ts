@@ -83,7 +83,7 @@ export function createAgentTools(supabase: DB, userId: string) {
       execute: async (input) => {
         const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== null));
         if (Object.keys(patch).length === 0) return fail("Nothing to update.");
-        const { error } = await supabase.from("career_preferences").upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
+        const { error } = await supabase.from("career_preferences").upsert({ user_id: userId, ...patch } as never, { onConflict: "user_id" });
         if (error) return fail(error.message);
         return ok({ updated: Object.keys(patch) });
       },

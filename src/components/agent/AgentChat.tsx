@@ -139,17 +139,13 @@ export function AgentChat({ threadId, initialMessages }: Props) {
                       };
                       const name = toolPart.type.replace(/^tool-/, "");
                       const Icon = TOOL_ICONS[name] ?? Wrench;
+                      void Icon;
                       return (
                         <Tool key={i} defaultOpen={false} className="my-2">
                           <ToolHeader
                             type={toolPart.type as `tool-${string}`}
                             state={toolPart.state}
-                            title={
-                              <span className="flex items-center gap-2">
-                                <Icon className="size-3.5" />
-                                {name.replace(/_/g, " ")}
-                              </span>
-                            }
+                            title={name.replace(/_/g, " ")}
                           />
                           <ToolContent>
                             <ToolInput input={toolPart.input} />

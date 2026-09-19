@@ -82,9 +82,11 @@ export const Route = createFileRoute("/api/chat")({
             { conversation_id: threadId, user_id: userId, role: "user", parts: last.parts as never, client_message_id: last.id },
             { onConflict: "conversation_id,client_message_id" },
           );
-          const patch: Record<string, unknown> = { last_message_at: new Date().toISOString() };
-          if (!thread.title) patch["title"] = textOf(last).slice(0, 60) || null;
-          await supabase.from("conversations").update(patch).eq("id", threadId);
+          const title = thread.title ?? (textOf(last).slice(0, 60) || null);
+          await supabase
+            .from("conversations")
+            .update({ last_message_at: new Date().toISOString(), title })
+            .eq("id", threadId);
         }
 
         const initialRunId = getLovableAiGatewayRunId(request);
