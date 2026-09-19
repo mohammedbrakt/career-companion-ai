@@ -21,6 +21,31 @@ function fail(message: string) {
 
 export function createAgentTools(supabase: DB, userId: string) {
   return {
+    get_master_cv: tool({
+      description:
+        "Read the user's Master CV: the parsed structured CV data and the AI review (strengths, gaps, ATS issues, open questions). Use it before discussing or tailoring the CV. Never invent CV content that is not here.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const cv = await supabase
+          .from("cvs")
+          .select("id, title, current_version_id")
+          .eq("user_id", userId)
+          .eq("kind", "master")
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (!cv.data) return ok({ has_cv: false, next_step: "Ask the user to upload their CV on the CV page, or build one together." });
+
+        const version = await supabase
+          .from("cv_versions")
+          .select("id, version_no, parsed_data, analysis, created_at")
+          .eq("cv_id", cv.data.id)
+          .order("version_no", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return ok({ has_cv: true, cv_id: cv.data.id, version: version.data });
+      },
+    }),
+
     get_career_profile: tool({
       description: "Read the user's career profile, preferences, targets, skills and remembered facts. Call before asking for information.",
       inputSchema: z.object({}),
