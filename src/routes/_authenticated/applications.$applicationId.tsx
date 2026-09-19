@@ -238,7 +238,7 @@ function ApplicationDetail() {
         )}
 
         {prepared && (
-          <div className="rounded-2xl border border-dashed border-border p-4">
+          <div className="hidden rounded-2xl border border-dashed border-border p-4 md:block">
             <div className="text-sm font-bold">{t.applications.autofillTitle}</div>
             <p className="mt-1 text-sm text-muted-foreground">{t.applications.autofillHow}</p>
             <a
