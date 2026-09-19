@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
+import { Route as AuthenticatedCvRouteImport } from './routes/_authenticated/cv'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -42,6 +43,11 @@ const AuthenticatedApplicationsRoute =
     path: '/applications',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCvRoute = AuthenticatedCvRouteImport.update({
+  id: '/cv',
+  path: '/cv',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
   id: '/home',
   path: '/home',
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/applications': typeof AuthenticatedApplicationsRoute
+  '/cv': typeof AuthenticatedCvRoute
   '/home': typeof AuthenticatedHomeRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/api/chat': typeof ApiChatRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/applications': typeof AuthenticatedApplicationsRoute
+  '/cv': typeof AuthenticatedCvRoute
   '/home': typeof AuthenticatedHomeRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/api/chat': typeof ApiChatRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
+  '/_authenticated/cv': typeof AuthenticatedCvRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/api/chat': typeof ApiChatRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/applications'
+    | '/cv'
     | '/home'
     | '/profile'
     | '/api/chat'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/applications'
+    | '/cv'
     | '/home'
     | '/profile'
     | '/api/chat'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/applications'
+    | '/_authenticated/cv'
     | '/_authenticated/home'
     | '/_authenticated/profile'
     | '/api/chat'
@@ -203,6 +215,13 @@ declare module '@tanstack/react-router' {
       path: '/applications'
       fullPath: '/applications'
       preLoaderRoute: typeof AuthenticatedApplicationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/cv': {
+      id: '/_authenticated/cv'
+      path: '/cv'
+      fullPath: '/cv'
+      preLoaderRoute: typeof AuthenticatedCvRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/home': {
@@ -266,6 +285,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
+  AuthenticatedCvRoute: typeof AuthenticatedCvRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedAgentThreadIdRoute: typeof AuthenticatedAgentThreadIdRoute
@@ -276,6 +296,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
+  AuthenticatedCvRoute: AuthenticatedCvRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedAgentThreadIdRoute: AuthenticatedAgentThreadIdRoute,
