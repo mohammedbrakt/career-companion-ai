@@ -314,7 +314,7 @@ export const autoApply = createServerFn({ method: "POST" })
     if (result.status === "submitted") {
       await supabase
         .from("applications")
-        .update({ stage: "applied", applied_at: new Date().toISOString(), mode: "direct_integration" })
+        .update({ stage: "applied", applied_at: new Date().toISOString(), mode: "direct" })
         .eq("id", app.data.id);
       await supabase.from("application_events").insert({
         user_id: userId,
