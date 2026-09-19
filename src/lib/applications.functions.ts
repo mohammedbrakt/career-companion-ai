@@ -112,7 +112,7 @@ ${JSON.stringify(profile.data ?? {}).slice(0, 3000)}`,
         .select("id")
         .single();
       if (created.error) throw new Error(created.error.message);
-      tailoredCvId = created.id ? created.id : created.data.id;
+      tailoredCvId = created.data.id;
     }
 
     const last = await supabase
