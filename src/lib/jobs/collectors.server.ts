@@ -390,33 +390,39 @@ const adzuna: JobCollector = {
   },
 };
 
-/** ISO country codes JSearch expects; anything unknown falls back to Egypt. */
-const JSEARCH_COUNTRY_CODES: Record<string, string> = {
-  egypt: "eg",
-  مصر: "eg",
-  "saudi arabia": "sa",
-  ksa: "sa",
-  "united arab emirates": "ae",
-  uae: "ae",
-  qatar: "qa",
-  kuwait: "kw",
-  bahrain: "bh",
-  oman: "om",
-  jordan: "jo",
-  lebanon: "lb",
-  morocco: "ma",
-  tunisia: "tn",
-  algeria: "dz",
-  turkey: "tr",
-  "united kingdom": "gb",
-  uk: "gb",
-  "united states": "us",
-  usa: "us",
-  germany: "de",
-  netherlands: "nl",
-  canada: "ca",
-  remote: "us",
+/**
+ * Worldwide country codes. Users are not only in the Arab world — Europe, the
+ * Americas, Asia and Africa all resolve here, so the same deep search serves
+ * everyone. Unknown names fall back to a worldwide (US-indexed) search.
+ */
+const COUNTRY_CODES: Record<string, string> = {
+  // MENA
+  egypt: "eg", مصر: "eg", "saudi arabia": "sa", ksa: "sa", السعودية: "sa",
+  "united arab emirates": "ae", uae: "ae", الإمارات: "ae", qatar: "qa", kuwait: "kw",
+  bahrain: "bh", oman: "om", jordan: "jo", lebanon: "lb", iraq: "iq",
+  morocco: "ma", tunisia: "tn", algeria: "dz", libya: "ly", sudan: "sd", turkey: "tr", israel: "il",
+  // Europe
+  "united kingdom": "gb", uk: "gb", england: "gb", ireland: "ie", germany: "de", deutschland: "de",
+  netherlands: "nl", holland: "nl", france: "fr", spain: "es", portugal: "pt", italy: "it",
+  belgium: "be", switzerland: "ch", austria: "at", sweden: "se", norway: "no", denmark: "dk",
+  finland: "fi", poland: "pl", "czech republic": "cz", czechia: "cz", romania: "ro", greece: "gr",
+  hungary: "hu", ukraine: "ua", bulgaria: "bg", croatia: "hr", serbia: "rs", estonia: "ee",
+  lithuania: "lt", latvia: "lv", luxembourg: "lu", slovakia: "sk", slovenia: "si",
+  // Americas
+  "united states": "us", usa: "us", us: "us", america: "us", canada: "ca", mexico: "mx",
+  brazil: "br", argentina: "ar", chile: "cl", colombia: "co", peru: "pe",
+  // Asia-Pacific & Africa
+  india: "in", pakistan: "pk", bangladesh: "bd", philippines: "ph", indonesia: "id",
+  malaysia: "my", singapore: "sg", "hong kong": "hk", japan: "jp", "south korea": "kr",
+  china: "cn", vietnam: "vn", thailand: "th", australia: "au", "new zealand": "nz",
+  "south africa": "za", nigeria: "ng", kenya: "ke", ghana: "gh", ethiopia: "et",
+  // Remote / worldwide
+  remote: "us", worldwide: "us", anywhere: "us", global: "us",
 };
+
+export function countryCode(name: string): string {
+  return COUNTRY_CODES[name.trim().toLowerCase()] ?? "us";
+}
 
 /** JSearch (RapidAPI) — Google-for-Jobs index: the widest local coverage, including Egypt. Needs JSEARCH_RAPIDAPI_KEY. */
 const jsearch: JobCollector = {
