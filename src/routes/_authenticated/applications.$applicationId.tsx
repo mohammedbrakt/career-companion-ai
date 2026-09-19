@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Sparkle, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Sparkle, User, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { prepareApplication, prepareInterview, setApplicationStage } from "@/lib/applications.functions";
 import { printApplicationDocuments } from "@/lib/cv/print";
+import { buildAutofillBookmarklet, splitName } from "@/lib/apply/autofill";
 import { track } from "@/lib/analytics";
 import { StageBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
