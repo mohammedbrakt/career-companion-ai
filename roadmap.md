@@ -78,3 +78,7 @@
 - [ ] Email domain setup → enables agent-sent applications by email (one-approve send, no copy/paste). User said "remind me later" on 2026-09-19 — raise it again in a future session.
 
 - [x] Direct auto-apply: employer ATS detection (Greenhouse, Lever, Workable, Ashby) + server-side submission for Greenhouse/Lever, generated CV file (PDF/TXT), one-button mobile apply, graceful fallback
+
+## Honest apply buttons (2026-09-19)
+- Job cards: gold "One Click Apply" ONLY when the apply link is a supported ATS (Greenhouse/Lever); everything else shows navy "Apply Now" that opens the employer's page. "1-click apply" tag on cards + filter chip to show only those.
+- Ingestion now follows board redirect links once to uncover the employer's real ATS URL before storing the job.

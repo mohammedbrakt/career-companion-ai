@@ -31,6 +31,58 @@ function isValid(job: NormalizedJob): boolean {
   return true;
 }
 
+const DIRECT_ATS_HOSTS = ["greenhouse.io", "lever.co", "workable.com", "ashbyhq.com"];
+
+function isDirectAts(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return DIRECT_ATS_HOSTS.some((a) => host.endsWith(a));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Boards hand out their own redirect links (remotive.com/…, jobicy.com/…), which
+ * hide the employer's real system (often Greenhouse or Lever). Following the
+ * redirect once at collection time is what makes true one-click apply visible.
+ */
+async function resolveRedirect(url: string, timeoutMs = 6000): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ShoghlniBot/1.0; +https://shoghlni.app)" },
+    });
+    if (res.url && res.url.startsWith("http")) return res.url;
+  } catch {
+    // Network hiccups keep the original link — never worse than before.
+  } finally {
+    clearTimeout(timer);
+  }
+  return url;
+}
+
+/** Resolve redirect links to their final destination, a small pool at a time. */
+async function resolveApplicationUrls(urls: string[], maxResolves = 120): Promise<Map<string, string>> {
+  const targets = [...new Set(urls.filter((u) => u && !isDirectAts(u)))].slice(0, maxResolves);
+  const resolved = new Map<string, string>();
+  const CONCURRENCY = 10;
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: CONCURRENCY }, async () => {
+      while (next < targets.length) {
+        const url = targets[next++]!;
+        const final = await resolveRedirect(url);
+        if (final !== url) resolved.set(url, final);
+      }
+    }),
+  );
+  return resolved;
+}
+
 async function buildContext(admin: DB): Promise<CollectorContext> {
   const [targets, prefs] = await Promise.all([
     admin.from("career_targets").select("title").neq("status", "removed").limit(200),
@@ -85,71 +137,84 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
     }),
   );
 
-  for (const { collector, raws, status } of harvest) {
-    result.collected += raws.length;
-    result.perSource[collector.key] = raws.length;
+  // Normalize + validate everything first, then resolve redirect links once —
+  // so dedupe and insertion all use the employer's real application URL.
+  const pending = harvest.flatMap(({ collector, raws }) =>
+    raws
+      .map((raw) => ({ collector, raw, job: normalizeJob(raw) }))
+      .filter(({ job }) => {
+        if (!isValid(job)) {
+          result.rejected++;
+          return false;
+        }
+        return true;
+      }),
+  );
+  const resolvedUrls = await resolveApplicationUrls(pending.map(({ job }) => job.application_url).filter((u): u is string => Boolean(u)));
+
+  for (const { collector, raw, job: normalized } of pending) {
+    const finalUrl = resolvedUrls.get(normalized.application_url!) ?? normalized.application_url;
+    const job = finalUrl !== normalized.application_url ? { ...normalized, application_url: finalUrl } : normalized;
+    result.collected++;
+    result.perSource[collector.key] = (result.perSource[collector.key] ?? 0) + 1;
 
     // Register the collector row (swappable provider registry).
     const { data: collectorRow } = await admin
       .from("job_collectors")
       .upsert(
-        { name: collector.name, kind: collector.kind, is_active: true, last_run_at: now, last_status: status, config: { key: collector.key }, stats: { last_collected: raws.length } },
+        { name: collector.name, kind: collector.kind, is_active: true, last_run_at: now, last_status: "ok", config: { key: collector.key }, stats: { last_collected: result.perSource[collector.key] } },
         { onConflict: "name" },
       )
       .select("id")
       .maybeSingle();
 
-    for (const raw of raws) {
-      const job = normalizeJob(raw);
-      if (!isValid(job)) {
+    // Deduplication — one canonical job record, many sources.
+    const existing = await admin.from("jobs").select("id, application_url").eq("fingerprint", job.fingerprint).maybeSingle();
+    let jobId = existing.data?.id ?? null;
+
+    if (jobId) {
+      result.duplicates++;
+      const urlChanged = job.application_url !== existing.data?.application_url;
+      await admin
+        .from("jobs")
+        .update(urlChanged ? { last_verified_at: now, status: "active", application_url: job.application_url } : { last_verified_at: now, status: "active" })
+        .eq("id", jobId);
+    } else {
+      const { data: created, error } = await admin
+        .from("jobs")
+        .insert({
+          ...job,
+          raw: job.raw as never,
+          status: "active",
+          last_verified_at: now,
+          posted_at: job.posted_at ?? now,
+        })
+        .select("id")
+        .maybeSingle();
+      if (error || !created) {
         result.rejected++;
         continue;
       }
-
-      // Deduplication — one canonical job record, many sources.
-      const existing = await admin.from("jobs").select("id").eq("fingerprint", job.fingerprint).maybeSingle();
-      let jobId = existing.data?.id ?? null;
-
-      if (jobId) {
-        result.duplicates++;
-        await admin.from("jobs").update({ last_verified_at: now, status: "active" }).eq("id", jobId);
-      } else {
-        const { data: created, error } = await admin
-          .from("jobs")
-          .insert({
-            ...job,
-            raw: job.raw as never,
-            status: "active",
-            last_verified_at: now,
-            posted_at: job.posted_at ?? now,
-          })
-          .select("id")
-          .maybeSingle();
-        if (error || !created) {
-          result.rejected++;
-          continue;
-        }
-        jobId = created.id;
-        result.inserted++;
-        const skillRows = [
-          ...job.required_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: true })),
-          ...job.preferred_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: false })),
-        ];
-        if (skillRows.length > 0) await admin.from("job_skills").insert(skillRows);
-      }
-
-      await admin.from("job_sources").upsert(
-        {
-          job_id: jobId,
-          collector_id: collectorRow?.id ?? null,
-          source_name: raw.source_name,
-          source_url: raw.source_url ?? null,
-          external_ref: raw.external_ref,
-          last_seen_at: now,
-        },
-        { onConflict: "source_name,external_ref" },
-      );
+      jobId = created.id;
+      result.inserted++;
+      const skillRows = [
+        ...job.required_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: true })),
+        ...job.preferred_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: false })),
+      ];
+      if (skillRows.length > 0) await admin.from("job_skills").insert(skillRows);
     }
+
+    await admin.from("job_sources").upsert(
+      {
+        job_id: jobId,
+        collector_id: collectorRow?.id ?? null,
+        source_name: raw.source_name,
+        source_url: raw.source_url ?? null,
+        external_ref: raw.external_ref,
+        last_seen_at: now,
+      },
+      { onConflict: "source_name,external_ref" },
+    );
   }
 
   result.expired = await expireStaleJobs(admin);

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { markInterested, saveJob, skipJob } from "@/lib/jobs.functions";
 import { prepareApplication } from "@/lib/applications.functions";
+import { detectAts } from "@/lib/apply/ats";
 import { useI18n } from "@/lib/i18n/context";
 import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,10 @@ export function JobActions({
   const interested = useServerFn(markInterested);
   const save = useServerFn(saveJob);
   const skip = useServerFn(skipJob);
+
+  // True one-click apply only exists when the employer runs on a system our
+  // agent can submit to directly (Greenhouse / Lever today).
+  const canOneClick = detectAts(applicationUrl)?.supported ?? false;
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["jobs-feed", userId] });
@@ -87,16 +92,17 @@ export function JobActions({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Button className={`${h} min-w-0 flex-1 rounded-2xl`} disabled={applying} onClick={() => void onOneClick()}>
-          <Sparkles className="size-4" /> <span className="truncate">{applying ? t.jobs.oneClickBusy : t.jobs.oneClick}</span>
-        </Button>
-        {applicationUrl && (
-          <Button asChild variant="outline" className={`${h} shrink-0 rounded-2xl`}>
+        {canOneClick ? (
+          <Button className={`${h} min-w-0 flex-1 rounded-2xl bg-gold text-gold-foreground shadow hover:bg-gold/90`} disabled={applying} onClick={() => void onOneClick()}>
+            <Sparkles className="size-4" /> <span className="truncate">{applying ? t.jobs.oneClickBusy : t.jobs.oneClick}</span>
+          </Button>
+        ) : applicationUrl ? (
+          <Button asChild className={`${h} min-w-0 flex-1 rounded-2xl`}>
             <a href={applicationUrl} target="_blank" rel="noreferrer">
-              <ExternalLink className="size-4" /> <span className={size === "sm" ? "hidden" : "inline"}>{t.jobs.applyNow}</span>
+              <ExternalLink className="size-4" /> <span className="truncate">{t.jobs.applyNow}</span>
             </a>
           </Button>
-        )}
+        ) : null}
         <Button variant="ghost" size={size === "sm" ? "icon-sm" : "icon"} className={`${h} w-auto shrink-0 rounded-2xl px-2 text-muted-foreground`} onClick={onSave} aria-label={t.jobs.save}>
           <Bookmark className="size-4" />
         </Button>

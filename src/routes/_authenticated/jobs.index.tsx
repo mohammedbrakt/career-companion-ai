@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Briefcase, RefreshCw, Search, SlidersHorizontal } from "lucide-react";
+import { Briefcase, RefreshCw, Search, SlidersHorizontal, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { jobsFeedQuery } from "@/lib/queries";
 import { discoverJobs } from "@/lib/jobs.functions";
+import { detectAts } from "@/lib/apply/ats";
 import { MatchScore } from "@/components/shared/MatchScore";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { JobActions } from "@/components/jobs/JobActions";
@@ -43,6 +44,7 @@ function JobsPage() {
   const [mode, setMode] = useState<Mode>("all");
   const [country, setCountry] = useState("all");
   const [minScore, setMinScore] = useState(0);
+  const [oneClickOnly, setOneClickOnly] = useState(false);
   const [sort, setSort] = useState<Sort>("score");
   const [discovering, setDiscovering] = useState(false);
 
@@ -59,12 +61,13 @@ function JobsPage() {
       if (mode !== "all" && m.job.work_arrangement !== mode) return false;
       if (country !== "all" && m.job.country !== country) return false;
       if (m.score < minScore) return false;
+      if (oneClickOnly && !(detectAts(m.job.application_url)?.supported ?? false)) return false;
       return true;
     });
     return list.sort((a, b) =>
       sort === "score" ? b.score - a.score : new Date(b.job.posted_at ?? 0).getTime() - new Date(a.job.posted_at ?? 0).getTime(),
     );
-  }, [feed.data, mode, country, minScore, sort]);
+  }, [feed.data, mode, country, minScore, oneClickOnly, sort]);
 
   const onDiscover = async () => {
     setDiscovering(true);
@@ -101,6 +104,17 @@ function JobsPage() {
         <Button variant={showFilters ? "default" : "outline"} className="h-12 rounded-2xl" onClick={() => setShowFilters((v) => !v)}>
           <SlidersHorizontal className="size-4" />
           <span className="hidden sm:inline">{t.jobs.filters}</span>
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={oneClickOnly ? "default" : "outline"}
+          className={`h-9 rounded-full px-4 text-xs font-semibold ${oneClickOnly ? "bg-gold text-gold-foreground hover:bg-gold/90" : ""}`}
+          onClick={() => setOneClickOnly((v) => !v)}
+          aria-pressed={oneClickOnly}
+        >
+          <Zap className="size-3.5" /> {t.jobs.oneClickTag}
         </Button>
       </div>
 
@@ -158,6 +172,11 @@ function JobsPage() {
                   <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                     {m.job.work_arrangement && <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{t.jobs[m.job.work_arrangement]}</span>}
                     {m.job.posted_at && <span className="rounded-full bg-muted px-2 py-0.5">{t.jobs.posted} {formatDate(m.job.posted_at, locale)}</span>}
+                    {(detectAts(m.job.application_url)?.supported ?? false) && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 font-semibold text-gold-foreground">
+                        <Zap className="size-3" /> {t.jobs.oneClickTag}
+                      </span>
+                    )}
                   </div>
                   {m.strengths.length > 0 && <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">{m.strengths[0]}</p>}
                 </div>
