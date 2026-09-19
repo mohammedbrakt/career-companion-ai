@@ -7,7 +7,7 @@ import { StageBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/_authenticated/applications")({
+export const Route = createFileRoute("/_authenticated/applications/")({
   head: () => ({
     meta: [
       { title: "Applications — Shoghlni | شغلني" },
