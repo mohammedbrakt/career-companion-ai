@@ -56,7 +56,7 @@ export function getLovableAiGatewayResponseHeaders(
 
 export function withLovableAiGatewayRunIdHeader(
   response: Response,
-  runIdFetch: { runId?: string },
+  runIdFetch: { readonly runId?: string | undefined },
 ): Response {
   if (!runIdFetch.runId) return response;
   const headers = new Headers(response.headers);

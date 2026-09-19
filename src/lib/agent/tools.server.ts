@@ -61,7 +61,7 @@ export function createAgentTools(supabase: DB, userId: string) {
       execute: async (input) => {
         const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== null));
         if (Object.keys(patch).length === 0) return fail("Nothing to update.");
-        const { error } = await supabase.from("profiles").update(patch).eq("user_id", userId);
+        const { error } = await supabase.from("profiles").update(patch as never).eq("user_id", userId);
         if (error) return fail(error.message);
         return ok({ updated: Object.keys(patch) });
       },
