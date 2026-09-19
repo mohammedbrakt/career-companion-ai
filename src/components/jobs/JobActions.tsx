@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Bookmark, Check, Sparkles, X } from "lucide-react";
+import { Bookmark, ExternalLink, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { markInterested, saveJob, skipJob } from "@/lib/jobs.functions";
+import { saveJob, skipJob } from "@/lib/jobs.functions";
 import { prepareApplication } from "@/lib/applications.functions";
 import { useI18n } from "@/lib/i18n/context";
 import { track } from "@/lib/analytics";
@@ -19,15 +19,23 @@ import {
 
 const REASONS = ["salary", "industry", "location", "too_junior", "too_senior", "company", "role", "other"] as const;
 
-export function JobActions({ jobId, userId, size = "default" }: { jobId: string; userId: string; size?: "default" | "sm" }) {
+export function JobActions({
+  jobId,
+  userId,
+  applicationUrl,
+  size = "default",
+}: {
+  jobId: string;
+  userId: string;
+  applicationUrl?: string | null;
+  size?: "default" | "sm";
+}) {
   const { t } = useI18n();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [applying, setApplying] = useState(false);
   const prepare = useServerFn(prepareApplication);
-  const interested = useServerFn(markInterested);
   const save = useServerFn(saveJob);
   const skip = useServerFn(skipJob);
 
@@ -36,21 +44,6 @@ export function JobActions({ jobId, userId, size = "default" }: { jobId: string;
     void qc.invalidateQueries({ queryKey: ["dashboard", userId] });
     void qc.invalidateQueries({ queryKey: ["applications", userId] });
     void qc.invalidateQueries({ queryKey: ["job", jobId, userId] });
-  };
-
-  const onInterested = async () => {
-    setBusy(true);
-    try {
-      const res = await interested({ data: { jobId } });
-      track("job_interested", { job_id: jobId });
-      invalidate();
-      toast.success(t.jobs.interestedDone);
-      if (res.applicationId) void navigate({ to: "/applications/$applicationId", params: { applicationId: res.applicationId } });
-    } catch {
-      toast.error(t.auth.genericError);
-    } finally {
-      setBusy(false);
-    }
   };
 
   const onSave = async () => {
@@ -92,17 +85,21 @@ export function JobActions({ jobId, userId, size = "default" }: { jobId: string;
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        <Button className={`${h} flex-1 rounded-2xl`} disabled={applying} onClick={() => void onOneClick()}>
-          <Sparkles className="size-4" /> {applying ? t.jobs.oneClickBusy : t.jobs.oneClick}
+      <div className="flex items-center gap-2">
+        <Button className={`${h} min-w-0 flex-1 rounded-2xl`} disabled={applying} onClick={() => void onOneClick()}>
+          <Sparkles className="size-4" /> <span className="truncate">{applying ? t.jobs.oneClickBusy : t.jobs.oneClick}</span>
         </Button>
-        <Button variant="outline" className={`${h} rounded-2xl`} disabled={busy} onClick={onInterested} aria-label={t.jobs.interested}>
-          <Check className="size-4" />
-        </Button>
-        <Button variant="outline" className={`${h} rounded-2xl`} onClick={onSave} aria-label={t.jobs.save}>
+        {applicationUrl && (
+          <Button asChild variant="outline" className={`${h} shrink-0 rounded-2xl`}>
+            <a href={applicationUrl} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" /> <span className={size === "sm" ? "hidden" : "inline"}>{t.jobs.applyNow}</span>
+            </a>
+          </Button>
+        )}
+        <Button variant="ghost" size={size === "sm" ? "icon-sm" : "icon"} className={`${h} w-auto shrink-0 rounded-2xl px-2 text-muted-foreground`} onClick={onSave} aria-label={t.jobs.save}>
           <Bookmark className="size-4" />
         </Button>
-        <Button variant="ghost" className={`${h} rounded-2xl`} onClick={() => setOpen(true)} aria-label={t.jobs.skip}>
+        <Button variant="ghost" size={size === "sm" ? "icon-sm" : "icon"} className={`${h} w-auto shrink-0 rounded-2xl px-2 text-muted-foreground`} onClick={() => setOpen(true)} aria-label={t.jobs.skip}>
           <X className="size-4" />
         </Button>
       </div>
