@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, LogOut, Settings2, Target, UserRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,7 +100,12 @@ function ProfilePage() {
 
       <Section icon={<FileText />} title={t.profile.documents}>
         <Row label={t.profile.masterCv} value={master?.title ?? null} />
-        {!master && <p className="text-xs text-muted-foreground">{t.profile.noCv}</p>}
+        {!master && <p className="mb-2 text-xs text-muted-foreground">{t.profile.noCv}</p>}
+        <Button asChild variant="outline" className="mt-2 h-11 w-full rounded-2xl">
+          <Link to="/cv">
+            <FileText className="size-4" /> {master ? t.cv.replace : t.cv.upload}
+          </Link>
+        </Button>
       </Section>
 
       <Section icon={<Settings2 />} title={t.profile.preferences}>
