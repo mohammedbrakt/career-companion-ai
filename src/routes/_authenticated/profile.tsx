@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
+import { subscriptionQuery } from "@/lib/queries";
+import { setTargetStatus } from "@/lib/profile.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -51,6 +54,13 @@ function ProfilePage() {
   const prefs = useQuery(preferencesQuery(user.id));
   const targets = useQuery(targetsQuery(user.id));
   const cvs = useQuery(cvsQuery(user.id));
+  const subscription = useQuery(subscriptionQuery(user.id));
+  const updateTarget = useServerFn(setTargetStatus);
+
+  async function decideTarget(targetId: string, status: "approved" | "removed") {
+    await updateTarget({ data: { targetId, status } });
+    await queryClient.invalidateQueries({ queryKey: ["targets", user.id] });
+  }
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -64,6 +74,9 @@ function ProfilePage() {
   const primary = targets.data?.find((x) => x.kind === "primary");
   const secondary = targets.data?.filter((x) => x.kind === "secondary") ?? [];
   const master = cvs.data?.find((c) => c.kind === "master");
+  const proposed = targets.data?.filter((x) => x.status === "suggested") ?? [];
+  const planNames = (subscription.data?.plan?.name ?? null) as { en?: string; ar?: string } | null;
+  const planName = planNames?.[locale] ?? planNames?.en ?? null;
 
   return (
     <div className="space-y-4">
@@ -108,9 +121,34 @@ function ProfilePage() {
         </Button>
       </Section>
 
+      <Section icon={<Target />} title={t.targets.title}>
+        {proposed.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t.targets.empty}</p>
+        ) : (
+          <ul className="space-y-2">
+            {proposed.map((target) => (
+              <li key={target.id} className="flex items-center gap-2 rounded-2xl bg-muted/60 p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{target.title}</div>
+                  <div className="truncate text-xs text-muted-foreground">{target.rationale ?? t.targets.proposed}</div>
+                </div>
+                <Button size="sm" className="rounded-xl" onClick={() => void decideTarget(target.id, "approved")}>{t.targets.approve}</Button>
+                <Button size="sm" variant="ghost" className="rounded-xl" onClick={() => void decideTarget(target.id, "removed")}>{t.targets.remove}</Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section icon={<Settings2 />} title={t.plan.title}>
+        <Row label={t.plan.title} value={planName} />
+        <Row label={t.plan.trialEnds} value={subscription.data?.trial_ends_at ? new Date(subscription.data.trial_ends_at).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB") : null} />
+        <p className="pt-1 text-xs text-muted-foreground">{t.plan.comingSoon}</p>
+      </Section>
+
       <Section icon={<Settings2 />} title={t.profile.preferences}>
         <Row label={t.profile.applicationPermission} value={prefs.data?.application_permission === "trusted_auto" ? t.profile.trustedAuto : t.profile.approvalRequired} />
-        <Row label={t.profile.plan} value={t.profile.freeTrial} />
+        
       </Section>
 
       <Button variant="outline" onClick={signOut} className="h-12 w-full rounded-2xl">

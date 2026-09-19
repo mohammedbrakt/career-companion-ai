@@ -51,6 +51,22 @@ export const agentStateQuery = (userId: string) =>
     },
   });
 
+export const subscriptionQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ["subscription", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("*, plan:subscription_plans(code, tier, name, limits)")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
 export const dashboardQuery = (userId: string) =>
   queryOptions({
     queryKey: ["dashboard", userId],
@@ -98,7 +114,7 @@ export const jobsFeedQuery = (userId: string, search: string) =>
         .select("id, score, status, strengths, gaps, job:jobs!inner(id, title, company, city, country, work_arrangement, posted_at, last_verified_at, status)")
         .eq("user_id", userId)
         .eq("eligible", true)
-        .neq("status", "hidden")
+        .not("status", "in", "(skipped,hidden)")
         .order("score", { ascending: false })
         .limit(50);
       if (search.trim()) q = q.or(`title.ilike.%${search}%,company.ilike.%${search}%`, { referencedTable: "jobs" });

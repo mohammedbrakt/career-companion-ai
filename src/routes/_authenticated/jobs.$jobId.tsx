@@ -7,6 +7,7 @@ import { MatchScore } from "@/components/shared/MatchScore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { JobActions } from "@/components/jobs/JobActions";
 
 export const Route = createFileRoute("/_authenticated/jobs/$jobId")({
   head: () => ({
@@ -111,12 +112,10 @@ function JobDetail() {
         </section>
       )}
 
-      <div className="sticky bottom-24 flex gap-2 md:static">
-        <Button asChild className="h-12 flex-1 rounded-2xl">
-          <Link to="/agent">{t.jobs.interested}</Link>
-        </Button>
+      <div className="sticky bottom-24 space-y-2 md:static">
+        <JobActions jobId={job.id} userId={user.id} />
         {job.application_url && (
-          <Button asChild variant="outline" className="h-12 rounded-2xl">
+          <Button asChild variant="outline" className="h-11 w-full rounded-2xl">
             <a href={job.application_url} target="_blank" rel="noreferrer"><ExternalLink className="size-4" /> {t.jobs.view}</a>
           </Button>
         )}
