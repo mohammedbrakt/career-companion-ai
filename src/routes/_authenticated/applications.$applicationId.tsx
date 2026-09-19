@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Sparkle, User, Wand2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Send, Sparkle, User, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n, formatDate } from "@/lib/i18n/context";
-import { prepareApplication, prepareInterview, setApplicationStage } from "@/lib/applications.functions";
+import { autoApply, prepareApplication, prepareInterview, setApplicationStage } from "@/lib/applications.functions";
+import { ATS_LABELS, detectAts } from "@/lib/apply/ats";
 import { printApplicationDocuments } from "@/lib/cv/print";
 import { buildAutofillBookmarklet, splitName } from "@/lib/apply/autofill";
 import { track } from "@/lib/analytics";
@@ -54,9 +55,10 @@ function ApplicationDetail() {
   const { t, locale, dir } = useI18n();
   const qc = useQueryClient();
   const Back = dir === "rtl" ? ArrowRight : ArrowLeft;
-  const [busy, setBusy] = useState<"prepare" | "interview" | null>(null);
+  const [busy, setBusy] = useState<"prepare" | "interview" | "send" | null>(null);
 
   const prepare = useServerFn(prepareApplication);
+  const sendApplication = useServerFn(autoApply);
   const interviewPrep = useServerFn(prepareInterview);
   const setStage = useServerFn(setApplicationStage);
 
@@ -158,6 +160,28 @@ function ApplicationDetail() {
     answers: prepared?.answers ?? [],
   });
 
+  const ats = detectAts(app.job?.application_url);
+
+  const onAutoApply = async () => {
+    setBusy("send");
+    try {
+      const res = await sendApplication({ data: { applicationId } });
+      if (res.status === "submitted") {
+        track("application_submitted", { application_id: applicationId, provider: res.provider });
+        toast.success(t.applications.autoApplyDone);
+      } else if (res.status === "unsupported") {
+        toast.message(t.applications.autoApplyUnsupported);
+      } else {
+        toast.error(t.applications.autoApplyFailed);
+      }
+      refresh();
+    } catch {
+      toast.error(t.applications.autoApplyFailed);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onDownload = () => {
     const ok = printApplicationDocuments({
       fullName: profile?.full_name ?? "",
@@ -201,6 +225,16 @@ function ApplicationDetail() {
               : t.applications.applyNotReady}
         </p>
 
+        {prepared && ats?.supported && app.stage !== "applied" && (
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+            <div className="text-sm font-bold">{t.applications.autoApplyTitle}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{t.applications.autoApplyBody(ATS_LABELS[ats.provider])}</p>
+            <Button className="mt-3 h-12 w-full rounded-2xl text-base" disabled={busy === "send"} onClick={() => void onAutoApply()}>
+              <Send className="size-4" /> {busy === "send" ? t.applications.autoApplySending : t.applications.autoApplyButton}
+            </Button>
+          </div>
+        )}
+
         {!prepared ? (
           <Button className="h-12 w-full rounded-2xl text-base sm:w-auto" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
             <Sparkle className="size-4" /> {busy === "prepare" ? t.applications.preparing : t.applications.prepare}
@@ -238,7 +272,7 @@ function ApplicationDetail() {
         )}
 
         {prepared && (
-          <div className="rounded-2xl border border-dashed border-border p-4">
+          <div className="hidden rounded-2xl border border-dashed border-border p-4 md:block">
             <div className="text-sm font-bold">{t.applications.autofillTitle}</div>
             <p className="mt-1 text-sm text-muted-foreground">{t.applications.autofillHow}</p>
             <a

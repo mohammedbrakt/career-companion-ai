@@ -76,3 +76,5 @@
 
 ## Deferred — user asked to be reminded later
 - [ ] Email domain setup → enables agent-sent applications by email (one-approve send, no copy/paste). User said "remind me later" on 2026-09-19 — raise it again in a future session.
+
+- [x] Direct auto-apply: employer ATS detection (Greenhouse, Lever, Workable, Ashby) + server-side submission for Greenhouse/Lever, generated CV file (PDF/TXT), one-button mobile apply, graceful fallback

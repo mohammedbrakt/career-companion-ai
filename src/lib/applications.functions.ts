@@ -252,3 +252,91 @@ export const prepareInterview = createServerFn({ method: "POST" })
 
     return prep;
   });
+
+/**
+ * Auto-apply — the agent submits the application directly to the employer's
+ * applicant tracking system (Greenhouse, Lever) when the link supports it.
+ * Falls back cleanly so the user can still apply manually.
+ */
+export const autoApply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => prepareInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { submitToAts } = await import("@/lib/apply/submit.server");
+    const { buildResumeFile } = await import("@/lib/apply/pdf.server");
+
+    const app = await supabase
+      .from("applications")
+      .select("id, job_id, stage, cv_version_id, cover_letter")
+      .eq("id", data.applicationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!app.data) throw new Error("application_not_found");
+
+    const [job, profile, version] = await Promise.all([
+      supabase.from("jobs").select("title, company, application_url").eq("id", app.data.job_id).maybeSingle(),
+      supabase.from("profiles").select("full_name, email, phone, city, country, headline").eq("user_id", userId).maybeSingle(),
+      app.data.cv_version_id
+        ? supabase.from("cv_versions").select("content").eq("id", app.data.cv_version_id).maybeSingle()
+        : Promise.resolve({ data: null as { content: unknown } | null }),
+    ]);
+    if (!version?.data) throw new Error("not_prepared");
+
+    const prepared = (version.data.content ?? {}) as z.infer<typeof preparedSchema> & { base_version_id?: string };
+    const fullName = profile.data?.full_name ?? "";
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const location = [profile.data?.city, profile.data?.country].filter(Boolean).join(", ");
+
+    const resume = buildResumeFile({
+      fullName,
+      contact: [profile.data?.email, profile.data?.phone, location].filter(Boolean).join(" · "),
+      headline: prepared.headline ?? profile.data?.headline ?? undefined,
+      summary: prepared.summary ?? undefined,
+      skills: prepared.highlighted_skills ?? undefined,
+      sections: (prepared.tailored_bullets ?? []).map((entry) => ({
+        title: `${entry.title} — ${entry.company}`,
+        lines: entry.bullets.map((b) => `• ${b}`),
+      })),
+    });
+
+    const result = await submitToAts(job.data?.application_url ?? null, {
+      fullName,
+      firstName: nameParts[0] ?? fullName,
+      lastName: nameParts.slice(1).join(" ") || (nameParts[0] ?? ""),
+      email: profile.data?.email ?? "",
+      phone: profile.data?.phone ?? "",
+      location,
+      coverLetter: prepared.cover_letter ?? app.data.cover_letter ?? "",
+      resume,
+    });
+
+    if (result.status === "submitted") {
+      await supabase
+        .from("applications")
+        .update({ stage: "applied", applied_at: new Date().toISOString(), mode: "direct" })
+        .eq("id", app.data.id);
+      await supabase.from("application_events").insert({
+        user_id: userId,
+        application_id: app.data.id,
+        event_type: "submitted",
+        actor: "agent",
+        description: `Application submitted directly to ${result.provider}`,
+        metadata: { provider: result.provider } as never,
+      });
+      await supabase
+        .from("analytics_events")
+        .insert({ user_id: userId, name: "application_submitted", properties: { application_id: app.data.id, provider: result.provider } as never });
+    } else {
+      await supabase.from("application_events").insert({
+        user_id: userId,
+        application_id: app.data.id,
+        event_type: "auto_apply_unavailable",
+        actor: "agent",
+        description: `Direct submission not possible (${result.reason})`,
+        metadata: result as never,
+      });
+    }
+
+    return result;
+  });
