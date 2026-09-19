@@ -150,10 +150,10 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
         return true;
       }),
   );
-  const resolvedUrls = await resolveApplicationUrls(pending.map(({ job }) => job.application_url));
+  const resolvedUrls = await resolveApplicationUrls(pending.map(({ job }) => job.application_url).filter((u): u is string => Boolean(u)));
 
   for (const { collector, raw, job: normalized } of pending) {
-    const finalUrl = resolvedUrls.get(normalized.application_url) ?? normalized.application_url;
+    const finalUrl = resolvedUrls.get(normalized.application_url!) ?? normalized.application_url;
     const job = finalUrl !== normalized.application_url ? { ...normalized, application_url: finalUrl } : normalized;
     result.collected++;
     result.perSource[collector.key] = (result.perSource[collector.key] ?? 0) + 1;
