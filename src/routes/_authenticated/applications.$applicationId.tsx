@@ -92,7 +92,7 @@ function ApplicationDetail() {
 
   if (q.isLoading) return <Skeleton className="h-96 rounded-3xl" />;
   if (!q.data) return null;
-  const { app, events, version, interviews } = q.data;
+  const { app, events, version, interviews, profile } = q.data;
   const prepared = (version?.content ?? null) as Prepared | null;
   const prep = (interviews.find((i) => i.prep)?.prep ?? null) as Prep | null;
 
@@ -142,17 +142,57 @@ function ApplicationDetail() {
         <StageBadge stage={app.stage} />
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        <Button className="h-11 rounded-2xl" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
-          <FileText className="size-4" /> {busy === "prepare" ? t.applications.preparing : t.applications.prepare}
-        </Button>
-        {app.job?.application_url && (
-          <Button asChild variant="outline" className="h-11 rounded-2xl">
-            <a href={app.job.application_url} target="_blank" rel="noreferrer" onClick={() => void move("applied")}>
-              <ExternalLink className="size-4" /> {t.applications.approveAndApply}
-            </a>
+      <section className="surface-card space-y-3 p-5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{t.applications.applyTitle}</h2>
+        <p className="text-sm text-muted-foreground">
+          {busy === "prepare"
+            ? t.applications.applyPreparing
+            : prepared
+              ? app.job?.application_url
+                ? t.applications.applyReady
+                : t.applications.noApplyLink
+              : t.applications.applyNotReady}
+        </p>
+
+        {!prepared ? (
+          <Button className="h-12 w-full rounded-2xl text-base sm:w-auto" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
+            <Sparkle className="size-4" /> {busy === "prepare" ? t.applications.preparing : t.applications.prepare}
           </Button>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {app.job?.application_url && (
+              <Button asChild className="h-12 rounded-2xl text-base">
+                <a href={app.job.application_url} target="_blank" rel="noreferrer" onClick={() => void onApplied()}>
+                  <ExternalLink className="size-4" /> {t.applications.applyNow}
+                </a>
+              </Button>
+            )}
+            {prepared.cover_letter && (
+              <Button variant="outline" className="h-12 rounded-2xl" onClick={() => copy(prepared.cover_letter ?? "")}>
+                <Copy className="size-4" /> {t.applications.copyCover}
+              </Button>
+            )}
+            {prepared.answers && prepared.answers.length > 0 && (
+              <Button
+                variant="outline"
+                className="h-12 rounded-2xl"
+                onClick={() => copy((prepared.answers ?? []).map((a) => `${a.question}\n${a.answer}`).join("\n\n"))}
+              >
+                <Copy className="size-4" /> {t.applications.copyAnswers}
+              </Button>
+            )}
+            <Button variant="outline" className="h-12 rounded-2xl" onClick={onDownload}>
+              <Download className="size-4" /> {t.applications.downloadCv}
+            </Button>
+            <Button variant="ghost" className="h-12 rounded-2xl" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
+              <FileText className="size-4" /> {t.applications.prepare}
+            </Button>
+          </div>
         )}
+      </section>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" className="h-11 rounded-2xl" onClick={() => void move("applied")}>{t.applications.markApplied}</Button>
         <Button variant="outline" className="h-11 rounded-2xl" onClick={() => void move("interview")}>{t.applications.markInterview}</Button>
         <Button variant="outline" className="h-11 rounded-2xl" onClick={() => void move("offer")}>{t.applications.markOffer}</Button>
       </div>
