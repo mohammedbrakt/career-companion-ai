@@ -156,7 +156,7 @@ export function createAgentTools(supabase: DB, userId: string) {
 
     deep_search_jobs: tool({
       description:
-        "Deep search: query every live external job source right now (remote boards plus any configured local/MENA aggregators) with specific role queries, pull fresh postings into the verified jobs database, re-score them for this user, and return the best results. Use when search_jobs finds nothing good, or when the user asks for a deeper/wider/new search. Pass several title variants, e.g. ['supply chain manager','logistics manager','demand planning manager','warehouse operations manager']. Tell the user you are searching before calling it.",
+        "Deep search: query every live external job source right now (remote boards worldwide plus any configured local aggregators (Europe, Americas, Gulf, Asia, Africa)) with specific role queries, pull fresh postings into the verified jobs database, re-score them for this user, and return the best results. Use when search_jobs finds nothing good, or when the user asks for a deeper/wider/new search. The agent automatically expands each title into related real-world job titles and searches them in parallel, then drops weak matches. Pass several title variants, e.g. ['supply chain manager','logistics manager','demand planning manager','warehouse operations manager']. Tell the user you are searching before calling it.",
       inputSchema: z.object({
         queries: z.array(z.string()),
         countries: z.array(z.string()).nullable(),
@@ -210,6 +210,7 @@ export function createAgentTools(supabase: DB, userId: string) {
         const availability = collectorAvailability();
         return ok({
           searched: cleaned,
+          searched_variants: expanded,
           countries: searchCountries,
           seconds: Math.round((Date.now() - started) / 1000),
           sources_searched: availability.enabled,
