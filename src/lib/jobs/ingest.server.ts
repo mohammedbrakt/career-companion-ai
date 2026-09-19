@@ -140,9 +140,9 @@ export async function runIngestion(admin: DB, collectorKeys?: string[]): Promise
   result.expired = await expireStaleJobs(admin);
   await admin.from("system_logs").insert({
     level: "info",
-    source: "cjde.ingestion",
+    area: "cjde.ingestion",
     message: `Ingestion run: ${result.inserted} new, ${result.duplicates} duplicates, ${result.rejected} rejected`,
-    context: result as never,
+    metadata: result as never,
   });
   return result;
 }

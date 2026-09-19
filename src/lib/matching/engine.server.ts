@@ -30,7 +30,7 @@ export type MatchResult = {
 };
 
 const SENIORITY_RANK: Record<Seniority, number> = {
-  entry: 1,
+  intern: 1,
   junior: 2,
   mid: 3,
   senior: 4,

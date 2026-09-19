@@ -79,11 +79,13 @@ const CITY_TO_COUNTRY: Record<string, string> = {
 };
 
 const SENIORITY_RULES: Array<[RegExp, Seniority]> = [
-  [/\b(chief|cxo|ceo|cto|cfo|coo|vp|vice president|head of|director)\b/i, "executive"],
+  [/\b(chief|cxo|ceo|cto|cfo|coo|vp|vice president|head of)\b/i, "executive"],
+  [/\bdirector\b/i, "director"],
   [/\b(senior manager|regional manager|general manager|manager)\b/i, "manager"],
   [/\b(lead|principal|staff)\b/i, "lead"],
   [/\b(senior|sr\.?|iii)\b/i, "senior"],
-  [/\b(junior|jr\.?|entry|graduate|trainee|intern)\b/i, "entry"],
+  [/\b(intern|internship)\b/i, "intern"],
+  [/\b(junior|jr\.?|entry|graduate|trainee)\b/i, "junior"],
 ];
 
 const EMPLOYMENT_RULES: Array<[RegExp, EmploymentType]> = [

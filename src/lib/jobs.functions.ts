@@ -48,11 +48,6 @@ export const saveJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await supabase.from("saved_jobs").upsert({ user_id: userId, job_id: data.jobId }, { onConflict: "user_id,job_id" });
-    await supabase
-      .from("user_job_matches")
-      .update({ status: "saved" })
-      .eq("user_id", userId)
-      .eq("job_id", data.jobId);
     return { ok: true };
   });
 
@@ -71,7 +66,7 @@ export const skipJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await supabase.from("hidden_jobs").upsert({ user_id: userId, job_id: data.jobId, reason: data.reason }, { onConflict: "user_id,job_id" });
-    await supabase.from("user_job_matches").update({ status: "hidden" }).eq("user_id", userId).eq("job_id", data.jobId);
+    await supabase.from("user_job_matches").update({ status: "skipped" }).eq("user_id", userId).eq("job_id", data.jobId);
     await supabase.from("feedback_events").insert({ user_id: userId, job_id: data.jobId, kind: "job_rejected", reason: data.reason, details: {} });
     await supabase.from("career_memory").upsert(
       { user_id: userId, kind: "behavior", key: `rejected_reason:${data.reason}`, value: { reason: data.reason, last_at: new Date().toISOString() } as never, confidence: 0.6 },
