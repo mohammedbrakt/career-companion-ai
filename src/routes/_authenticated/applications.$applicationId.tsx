@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Bot, Building2, ExternalLink, FileText, MessageSquareQuote, Sparkle, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Building2, Copy, Download, ExternalLink, FileText, MessageSquareQuote, Sparkle, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n, formatDate } from "@/lib/i18n/context";
 import { prepareApplication, prepareInterview, setApplicationStage } from "@/lib/applications.functions";
+import { printApplicationDocuments } from "@/lib/cv/print";
+import { track } from "@/lib/analytics";
 import { StageBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,14 +69,21 @@ function ApplicationDetail() {
         .eq("user_id", user.id)
         .single();
       if (app.error) throw app.error;
-      const [events, version, interviews] = await Promise.all([
+      const [events, version, interviews, profile] = await Promise.all([
         supabase.from("application_events").select("*").eq("application_id", applicationId).order("occurred_at", { ascending: false }),
         app.data.cv_version_id
           ? supabase.from("cv_versions").select("id, version_no, content").eq("id", app.data.cv_version_id).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from("interviews").select("id, prep, scheduled_at").eq("application_id", applicationId),
+        supabase.from("profiles").select("full_name, email, phone, city, country, headline").eq("user_id", user.id).maybeSingle(),
       ]);
-      return { app: app.data, events: events.data ?? [], version: version.data, interviews: interviews.data ?? [] };
+      return {
+        app: app.data,
+        events: events.data ?? [],
+        version: version.data,
+        interviews: interviews.data ?? [],
+        profile: profile.data,
+      };
     },
   });
 
@@ -85,7 +94,7 @@ function ApplicationDetail() {
 
   if (q.isLoading) return <Skeleton className="h-96 rounded-3xl" />;
   if (!q.data) return null;
-  const { app, events, version, interviews } = q.data;
+  const { app, events, version, interviews, profile } = q.data;
   const prepared = (version?.content ?? null) as Prepared | null;
   const prep = (interviews.find((i) => i.prep)?.prep ?? null) as Prep | null;
 
@@ -120,6 +129,36 @@ function ApplicationDetail() {
     refresh();
   };
 
+  const copy = (text: string) => {
+    void navigator.clipboard.writeText(text);
+    toast.success(t.applications.copied);
+  };
+
+  const onApplied = async () => {
+    track("application_submitted", { application_id: applicationId });
+    if (app.stage !== "applied") {
+      await setStage({ data: { applicationId, stage: "applied", note: null, closedReason: null } });
+      toast.success(t.applications.appliedMarked);
+      refresh();
+    }
+  };
+
+  const onDownload = () => {
+    const ok = printApplicationDocuments({
+      fullName: profile?.full_name ?? "",
+      contact: [profile?.email, profile?.phone, [profile?.city, profile?.country].filter(Boolean).join(", ")].filter(Boolean).join(" · "),
+      jobTitle: app.job?.title ?? "",
+      company: app.job?.company ?? "",
+      headline: prepared?.headline ?? profile?.headline ?? undefined,
+      summary: prepared?.summary ?? undefined,
+      skills: prepared?.highlighted_skills ?? undefined,
+      bullets: prepared?.tailored_bullets ?? undefined,
+      coverLetter: prepared?.cover_letter ?? undefined,
+      dir,
+    });
+    if (!ok) toast.error(t.applications.popupBlocked);
+  };
+
   return (
     <div className="space-y-5">
       <Link to="/applications" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
@@ -135,17 +174,57 @@ function ApplicationDetail() {
         <StageBadge stage={app.stage} />
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        <Button className="h-11 rounded-2xl" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
-          <FileText className="size-4" /> {busy === "prepare" ? t.applications.preparing : t.applications.prepare}
-        </Button>
-        {app.job?.application_url && (
-          <Button asChild variant="outline" className="h-11 rounded-2xl">
-            <a href={app.job.application_url} target="_blank" rel="noreferrer" onClick={() => void move("applied")}>
-              <ExternalLink className="size-4" /> {t.applications.approveAndApply}
-            </a>
+      <section className="surface-card space-y-3 p-5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{t.applications.applyTitle}</h2>
+        <p className="text-sm text-muted-foreground">
+          {busy === "prepare"
+            ? t.applications.applyPreparing
+            : prepared
+              ? app.job?.application_url
+                ? t.applications.applyReady
+                : t.applications.noApplyLink
+              : t.applications.applyNotReady}
+        </p>
+
+        {!prepared ? (
+          <Button className="h-12 w-full rounded-2xl text-base sm:w-auto" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
+            <Sparkle className="size-4" /> {busy === "prepare" ? t.applications.preparing : t.applications.prepare}
           </Button>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {app.job?.application_url && (
+              <Button asChild className="h-12 rounded-2xl text-base">
+                <a href={app.job.application_url} target="_blank" rel="noreferrer" onClick={() => void onApplied()}>
+                  <ExternalLink className="size-4" /> {t.applications.applyNow}
+                </a>
+              </Button>
+            )}
+            {prepared.cover_letter && (
+              <Button variant="outline" className="h-12 rounded-2xl" onClick={() => copy(prepared.cover_letter ?? "")}>
+                <Copy className="size-4" /> {t.applications.copyCover}
+              </Button>
+            )}
+            {prepared.answers && prepared.answers.length > 0 && (
+              <Button
+                variant="outline"
+                className="h-12 rounded-2xl"
+                onClick={() => copy((prepared.answers ?? []).map((a) => `${a.question}\n${a.answer}`).join("\n\n"))}
+              >
+                <Copy className="size-4" /> {t.applications.copyAnswers}
+              </Button>
+            )}
+            <Button variant="outline" className="h-12 rounded-2xl" onClick={onDownload}>
+              <Download className="size-4" /> {t.applications.downloadCv}
+            </Button>
+            <Button variant="ghost" className="h-12 rounded-2xl" disabled={busy === "prepare"} onClick={() => void onPrepare()}>
+              <FileText className="size-4" /> {t.applications.prepare}
+            </Button>
+          </div>
         )}
+      </section>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" className="h-11 rounded-2xl" onClick={() => void move("applied")}>{t.applications.markApplied}</Button>
         <Button variant="outline" className="h-11 rounded-2xl" onClick={() => void move("interview")}>{t.applications.markInterview}</Button>
         <Button variant="outline" className="h-11 rounded-2xl" onClick={() => void move("offer")}>{t.applications.markOffer}</Button>
       </div>
