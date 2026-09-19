@@ -180,42 +180,41 @@ export async function runIngestion(admin: DB, collectorKeys?: string[], ctxOverr
         .update(urlChanged ? { last_verified_at: now, status: "active", application_url: job.application_url } : { last_verified_at: now, status: "active" })
         .eq("id", jobId);
     } else {
-        const { data: created, error } = await admin
-          .from("jobs")
-          .insert({
-            ...job,
-            raw: job.raw as never,
-            status: "active",
-            last_verified_at: now,
-            posted_at: job.posted_at ?? now,
-          })
-          .select("id")
-          .maybeSingle();
-        if (error || !created) {
-          result.rejected++;
-          continue;
-        }
-        jobId = created.id;
-        result.inserted++;
-        const skillRows = [
-          ...job.required_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: true })),
-          ...job.preferred_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: false })),
-        ];
-        if (skillRows.length > 0) await admin.from("job_skills").insert(skillRows);
+      const { data: created, error } = await admin
+        .from("jobs")
+        .insert({
+          ...job,
+          raw: job.raw as never,
+          status: "active",
+          last_verified_at: now,
+          posted_at: job.posted_at ?? now,
+        })
+        .select("id")
+        .maybeSingle();
+      if (error || !created) {
+        result.rejected++;
+        continue;
       }
-
-      await admin.from("job_sources").upsert(
-        {
-          job_id: jobId,
-          collector_id: collectorRow?.id ?? null,
-          source_name: raw.source_name,
-          source_url: raw.source_url ?? null,
-          external_ref: raw.external_ref,
-          last_seen_at: now,
-        },
-        { onConflict: "source_name,external_ref" },
-      );
+      jobId = created.id;
+      result.inserted++;
+      const skillRows = [
+        ...job.required_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: true })),
+        ...job.preferred_skills.map((name) => ({ job_id: jobId!, name, normalized_name: name.toLowerCase(), required: false })),
+      ];
+      if (skillRows.length > 0) await admin.from("job_skills").insert(skillRows);
     }
+
+    await admin.from("job_sources").upsert(
+      {
+        job_id: jobId,
+        collector_id: collectorRow?.id ?? null,
+        source_name: raw.source_name,
+        source_url: raw.source_url ?? null,
+        external_ref: raw.external_ref,
+        last_seen_at: now,
+      },
+      { onConflict: "source_name,external_ref" },
+    );
   }
 
   result.expired = await expireStaleJobs(admin);
