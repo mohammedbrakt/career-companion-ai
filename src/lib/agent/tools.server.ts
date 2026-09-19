@@ -156,24 +156,37 @@ export function createAgentTools(supabase: DB, userId: string) {
 
     deep_search_jobs: tool({
       description:
-        "Deep search: go out to the live external job sources right now with specific role queries, pull fresh postings into the verified jobs database, re-score them for this user, and return the best results. Use this when search_jobs finds nothing good, or when the user asks for a deeper/wider/new search. It takes up to a minute, so tell the user you are searching before calling it. Queries should be plain job titles, e.g. ['supply chain manager','logistics manager'].",
+        "Deep search: query every live external job source right now (remote boards plus any configured local/MENA aggregators) with specific role queries, pull fresh postings into the verified jobs database, re-score them for this user, and return the best results. Use when search_jobs finds nothing good, or when the user asks for a deeper/wider/new search. Pass several title variants, e.g. ['supply chain manager','logistics manager','demand planning manager','warehouse operations manager']. Tell the user you are searching before calling it.",
       inputSchema: z.object({
         queries: z.array(z.string()),
         countries: z.array(z.string()).nullable(),
         min_score: z.number().nullable(),
       }),
       execute: async ({ queries, countries, min_score }) => {
-        const cleaned = [...new Set(queries.map((q) => q.trim()).filter(Boolean))].slice(0, 6);
+        const cleaned = [...new Set(queries.map((q) => q.trim().toLowerCase()).filter(Boolean))].slice(0, 10);
         if (cleaned.length === 0) return fail("Give at least one role title to search for.");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { runIngestion } = await import("@/lib/jobs/ingest.server");
         const { computeMatchesForUser } = await import("@/lib/matching/run.server");
+        const { collectorAvailability } = await import("@/lib/jobs/collectors.server");
 
+        // Widen the net: add the user's own saved target countries when none were given.
+        let searchCountries = countries ?? [];
+        if (searchCountries.length === 0) {
+          const prefs = await supabase
+            .from("career_preferences")
+            .select("target_countries")
+            .eq("user_id", userId)
+            .maybeSingle();
+          searchCountries = prefs.data?.target_countries ?? [];
+        }
+
+        const started = Date.now();
         let ingestion;
         try {
           ingestion = await runIngestion(supabaseAdmin, undefined, {
             queries: cleaned,
-            countries: countries ?? [],
+            countries: searchCountries,
             limit: 50,
           });
         } catch (error) {
@@ -188,17 +201,26 @@ export function createAgentTools(supabase: DB, userId: string) {
           .eq("eligible", true)
           .gte("score", min_score ?? 0)
           .order("score", { ascending: false })
-          .limit(8);
+          .limit(10);
 
+        const availability = collectorAvailability();
         return ok({
           searched: cleaned,
-          sources: ingestion.perSource,
+          countries: searchCountries,
+          seconds: Math.round((Date.now() - started) / 1000),
+          sources_searched: availability.enabled,
+          sources_not_connected: availability.missingKey,
+          per_source_results: ingestion.perSource,
           new_jobs: ingestion.inserted,
           already_known: ingestion.duplicates,
           top_matches: matches ?? [],
           note:
             (matches ?? []).length === 0
-              ? "Nothing eligible came back from the live sources for these queries. Suggest different role titles or a wider location."
+              ? `Nothing eligible came back for these queries.${
+                  availability.missingKey.length > 0
+                    ? ` The local/on-site job aggregators (${availability.missingKey.join(", ")}) are not connected yet, so only remote boards were searched — tell the user that connecting them is what unlocks local ${searchCountries.join(", ") || "in-country"} jobs.`
+                    : ""
+                } Otherwise suggest different role titles or a wider location.`
               : null,
         });
       },
