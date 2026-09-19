@@ -22,7 +22,7 @@
 - [x] Agent streaming chat (AI Elements, `/api/chat`, tool calling, DB-persisted threads/messages)
 - [~] Agent state machine (agent_states written by `set_agent_state`); one-next-action buttons still to add
 - [ ] Conversational onboarding (track detection, preferences, CV ask)
-- [ ] CV upload → parse → Master CV + Career Profile + missing-info questions
+- [x] CV upload → parse → Master CV (versions, AI review, user approval writes profile + skills; agent reads it via `get_master_cv`)
 - [x] Career Brain memory read/write tools (`remember_fact`, snapshot injected into every turn)
 - [ ] Target Role Engine (primary/secondary suggestions, approve/remove)
 - [ ] CJDE: collector interface, normalization, fingerprint dedupe, freshness validation (cron)
