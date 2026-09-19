@@ -221,6 +221,22 @@ function ApplicationDetail() {
             </Button>
           </div>
         )}
+
+        {prepared && (
+          <div className="rounded-2xl border border-dashed border-border p-4">
+            <div className="text-sm font-bold">{t.applications.autofillTitle}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{t.applications.autofillHow}</p>
+            <a
+              href={bookmarklet}
+              draggable
+              onClick={(e) => e.preventDefault()}
+              title={t.applications.autofillDragHint}
+              className="mt-3 inline-flex h-11 cursor-grab items-center gap-2 rounded-2xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-soft"
+            >
+              <Wand2 className="size-4" /> {t.applications.autofillButton}
+            </a>
+          </div>
+        )}
       </section>
 
       <div className="flex flex-wrap gap-2">
