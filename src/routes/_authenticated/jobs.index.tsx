@@ -44,6 +44,7 @@ function JobsPage() {
   const [mode, setMode] = useState<Mode>("all");
   const [country, setCountry] = useState("all");
   const [minScore, setMinScore] = useState(0);
+  const [oneClickOnly, setOneClickOnly] = useState(false);
   const [sort, setSort] = useState<Sort>("score");
   const [discovering, setDiscovering] = useState(false);
 
@@ -60,12 +61,13 @@ function JobsPage() {
       if (mode !== "all" && m.job.work_arrangement !== mode) return false;
       if (country !== "all" && m.job.country !== country) return false;
       if (m.score < minScore) return false;
+      if (oneClickOnly && !(detectAts(m.job.application_url)?.supported ?? false)) return false;
       return true;
     });
     return list.sort((a, b) =>
       sort === "score" ? b.score - a.score : new Date(b.job.posted_at ?? 0).getTime() - new Date(a.job.posted_at ?? 0).getTime(),
     );
-  }, [feed.data, mode, country, minScore, sort]);
+  }, [feed.data, mode, country, minScore, oneClickOnly, sort]);
 
   const onDiscover = async () => {
     setDiscovering(true);
