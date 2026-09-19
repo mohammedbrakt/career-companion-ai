@@ -107,6 +107,17 @@ function JobsPage() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={oneClickOnly ? "default" : "outline"}
+          className={`h-9 rounded-full px-4 text-xs font-semibold ${oneClickOnly ? "bg-gold text-gold-foreground hover:bg-gold/90" : ""}`}
+          onClick={() => setOneClickOnly((v) => !v)}
+          aria-pressed={oneClickOnly}
+        >
+          <Zap className="size-3.5" /> {t.jobs.oneClickTag}
+        </Button>
+      </div>
+
       {showFilters && (
         <div className="surface-card grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
@@ -161,6 +172,11 @@ function JobsPage() {
                   <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                     {m.job.work_arrangement && <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{t.jobs[m.job.work_arrangement]}</span>}
                     {m.job.posted_at && <span className="rounded-full bg-muted px-2 py-0.5">{t.jobs.posted} {formatDate(m.job.posted_at, locale)}</span>}
+                    {(detectAts(m.job.application_url)?.supported ?? false) && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 font-semibold text-gold-foreground">
+                        <Zap className="size-3" /> {t.jobs.oneClickTag}
+                      </span>
+                    )}
                   </div>
                   {m.strengths.length > 0 && <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">{m.strengths[0]}</p>}
                 </div>
