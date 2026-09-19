@@ -74,7 +74,7 @@ function ProfilePage() {
   const primary = targets.data?.find((x) => x.kind === "primary");
   const secondary = targets.data?.filter((x) => x.kind === "secondary") ?? [];
   const master = cvs.data?.find((c) => c.kind === "master");
-  const proposed = targets.data?.filter((x) => x.status === "proposed") ?? [];
+  const proposed = targets.data?.filter((x) => x.status === "suggested") ?? [];
   const planNames = (subscription.data?.plan?.name ?? null) as { en?: string; ar?: string } | null;
   const planName = planNames?.[locale] ?? planNames?.en ?? null;
 
