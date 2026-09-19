@@ -13,7 +13,7 @@ export async function extractDocumentText(bytes: Uint8Array, fileType: string, f
     const { extractText, getDocumentProxy } = await import("unpdf");
     const doc = await getDocumentProxy(bytes);
     const { text } = await extractText(doc, { mergePages: true });
-    return typeof text === "string" ? text : text.join("\n");
+    return Array.isArray(text) ? (text as string[]).join("\n") : (text as string);
   }
 
   if (type.startsWith("text/") || name.endsWith(".txt") || name.endsWith(".md")) {
